@@ -1,5 +1,52 @@
 #include "stdafx.h"
 #include <Debug/CImGui.h>
+#include <filesystem>
+
+// SilentPatch hooks the isAlreadyRunning call at 0x74872D, so we must not nop it when SilentPatch will load.
+// When it sits in modloader/ or scripts/ it is loaded *after* us, so GetModuleHandle alone misses it.
+static bool IsSilentPatchInstalled()
+{
+    if (GetModuleHandleA("SilentPatchSA.asi"))
+    {
+        return true;
+    }
+
+    char exePath[MAX_PATH];
+    if (!GetModuleFileNameA(NULL, exePath, MAX_PATH))
+    {
+        return false;
+    }
+
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    fs::path gameDir = fs::path(exePath).parent_path();
+
+    for (const char* dir : {".", "scripts"})
+    {
+        if (fs::exists(gameDir / dir / "SilentPatchSA.asi", ec))
+        {
+            return true;
+        }
+    }
+
+    fs::path modloaderDir = gameDir / "modloader";
+    if (fs::is_directory(modloaderDir, ec))
+    {
+        for (auto it = fs::recursive_directory_iterator(modloaderDir, fs::directory_options::skip_permission_denied, ec);
+             it != fs::recursive_directory_iterator(); it.increment(ec))
+        {
+            if (ec)
+            {
+                break;
+            }
+            if (_stricmp(it->path().filename().string().c_str(), "SilentPatchSA.asi") == 0)
+            {
+                return true;
+            }
+        }
+    }
+    return false;
+}
 
 // temporary disable some game content
 
@@ -271,7 +318,7 @@ void FixCrashes()
     patch::SetFloat(0x86D26C, 10.0f);
 
     // patch isAlreadyRunning, so we can run more than one game instance
-    if (GetModuleHandleA("SilentPatchSA.asi"))
+    if (IsSilentPatchInstalled())
     {
         patch::SetRaw(0x74872D, (void*)"\xE8\xAE\xE1\xFF\xFF\x85\xC0\x75\x0F", 9);
         patch::PutRetn0(0x7468E0);
