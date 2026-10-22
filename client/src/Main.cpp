@@ -32,6 +32,7 @@
 #include <network/packets/scripts.h>
 #include "CAutoTest.h"
 #include "Commands/Commands/CCommandTeleportPlayersToHostSafely.h"
+#include "CMissionPartnerVehicles.h"
 
 unsigned int lastOnFootSyncTickRate = 0;
 unsigned int lastDriverSyncTickRate = 0;
@@ -130,6 +131,7 @@ public:
 
                 CPassengerEnter::Process();
                 CCommandTeleportPlayersToHostSafely::ProcessPendingTeleport();
+                CMissionPartnerVehicles::Process();
 
                 CPlayerPed* localPlayer = FindPlayerPed(0);
 

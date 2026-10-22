@@ -522,6 +522,36 @@ void CAutoTest::Execute(const std::string& line)
     {
         player->m_fHealth = 0.0f;
     }
+    else if (verb == "entermissioncar")
+    {
+        // what a player does in most missions: get into the mission vehicle (nearest, within 80 m)
+        CVehicle* best = nullptr;
+        float bestDist = 80.0f;
+        for (int i = 0; i < CPools::ms_pVehiclePool->m_nSize; i++)
+        {
+            CVehicle* v = CPools::ms_pVehiclePool->GetAt(i);
+            if (!v || v->m_nCreatedBy != eVehicleCreatedBy::MISSION_VEHICLE || v->m_pDriver)
+                continue;
+            float d = (v->GetPosition() - player->GetPosition()).Magnitude();
+            if (d < bestDist)
+            {
+                bestDist = d;
+                best = v;
+            }
+        }
+        if (best && !player->m_nPedFlags.bInVehicle)
+            Command<Commands::WARP_CHAR_INTO_CAR>(CPools::GetPedRef(player), CPools::GetVehicleRef(best));
+        else
+            result = best ? "already in a vehicle" : "no free mission vehicle within 80 m";
+    }
+    else if (verb == "failmission")
+    {
+        // opcode 045C fail_current_mission: the running mission script goes to its fail/cleanup path
+        if (FindMissionScript())
+            Command<Commands::FAIL_CURRENT_MISSION>();
+        else
+            result = "no mission script";
+    }
     else if (verb == "startmission")
     {
         // what a mission trigger does after its marker check (e.g. scm/scripts/INT.txt)
