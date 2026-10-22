@@ -5,10 +5,14 @@
 //
 // usage: CoopAndreasBot [--host 127.0.0.1] [--port 6767] [--name Bot1] [--index 0]
 //                       [--duration 15] [--expect-peers N] [--expect-refused] [--no-chat]
+//                       [--stand X Y Z]   stand still at a point instead of walking a circle (mission markers)
+//                       [--vote-skip]     vote to skip every cutscene the host starts
+// The RESULT also lists the mission traffic received: on-mission flags, cutscene opcodes, skip votes, GXT texts.
 
 #include "stdafx.h"
 #include "network/packets/system.h"
 #include "network/packets/players.h"
+#include "network/packets/scripts.h"
 
 #include <chrono>
 #include <set>
@@ -35,6 +39,23 @@ struct SArgs
     int expectPeers = -1;
     bool expectRefused = false;
     bool chat = true;
+    bool stand = false;
+    CVector standPos{};
+    bool voteSkip = false;
+};
+
+// mission traffic seen by this bot, reported in RESULT
+struct SMissionLog
+{
+    std::string onMissionFlags;  // "1" / "0" per ON_MISSION_FLAG_SYNC, in order
+    int opcodes = 0;
+    bool loadCutscene = false;   // 0x02E4
+    bool startCutscene = false;  // 0x02E7
+    bool clearCutscene = false;  // 0x02EA
+    int maxVoters = 0;
+    int maxVotes = 0;
+    int votesSent = 0;
+    std::string gxt;             // texts the host printed for us, space separated
 };
 
 struct SPeer
@@ -130,13 +151,34 @@ static SArgs ParseArgs(int argc, char* argv[])
         else if (a == "--expect-peers") args.expectPeers = atoi(next());
         else if (a == "--expect-refused") args.expectRefused = true;
         else if (a == "--no-chat") args.chat = false;
+        else if (a == "--vote-skip") args.voteSkip = true;
+        else if (a == "--stand")
+        {
+            args.stand = true;
+            args.standPos.x = (float)atof(next());
+            args.standPos.y = (float)atof(next());
+            args.standPos.z = (float)atof(next());
+        }
     }
     return args;
+}
+
+static SMissionLog g_mission;
+
+// printed whenever mission traffic arrives, so the latest line is valid even if the bot gets killed
+static void PrintMission()
+{
+    printf("MISSION {\"onMissionFlags\":\"%s\",\"opcodes\":%d,\"loadCutscene\":%s,\"startCutscene\":%s,"
+           "\"clearCutscene\":%s,\"maxVoters\":%d,\"maxVotes\":%d,\"votesSent\":%d,\"gxt\":\"%s\"}\n",
+        g_mission.onMissionFlags.c_str(), g_mission.opcodes, g_mission.loadCutscene ? "true" : "false",
+        g_mission.startCutscene ? "true" : "false", g_mission.clearCutscene ? "true" : "false", g_mission.maxVoters,
+        g_mission.maxVotes, g_mission.votesSent, g_mission.gxt.c_str());
 }
 
 static void PrintResult(const SArgs& args, bool pass, const char* status, playerid_t myId,
     const std::map<uint32_t, SPeer>& peers)
 {
+    PrintMission();
     printf("RESULT {\"name\":\"%s\",\"pass\":%s,\"status\":\"%s\",\"id\":%u,\"peers\":[", args.name.c_str(),
         pass ? "true" : "false", status, myId.value());
     bool first = true;
@@ -152,6 +194,7 @@ static void PrintResult(const SArgs& args, bool pass, const char* status, player
 
 int main(int argc, char* argv[])
 {
+    setvbuf(stdout, nullptr, _IONBF, 0);  // logs survive the test script killing us
     SArgs args = ParseArgs(argc, argv);
     std::map<uint32_t, SPeer> peers;
     playerid_t myId{};
@@ -274,6 +317,50 @@ int main(int argc, char* argv[])
                     peer.lastPos = p->vecPos;
                     break;
                 }
+                case ePacketType::ON_MISSION_FLAG_SYNC:
+                {
+                    g_mission.onMissionFlags += static_cast<Packets::Scripts::OnMissionFlagSync*>(pPacket)->bOnMission ? "1" : "0";
+                    PrintMission();
+                    break;
+                }
+                case ePacketType::OPCODE_SYNC:
+                {
+                    auto* p = static_cast<Packets::Scripts::OpCodeSync*>(pPacket);
+                    g_mission.opcodes++;
+                    uint16_t opcode = *(uint16_t*)&p->buffer[0];
+                    g_mission.loadCutscene |= opcode == 0x02E4;
+                    g_mission.startCutscene |= opcode == 0x02E7;
+                    g_mission.clearCutscene |= opcode == 0x02EA;
+                    if (opcode == 0x02E4 || opcode == 0x02E7 || opcode == 0x02EA)
+                        PrintMission();
+                    break;
+                }
+                case ePacketType::ADD_MESSAGE_GXT:
+                {
+                    auto* p = static_cast<Packets::Scripts::AddMessageGXT*>(pPacket);
+                    if (g_mission.gxt.size() < 200)
+                        g_mission.gxt += std::string(g_mission.gxt.empty() ? "" : " ") + p->gxt;
+                    PrintMission();
+                    break;
+                }
+                case ePacketType::CUTSCENE_SKIP_VOTE_STATE:
+                {
+                    auto* p = static_cast<Packets::Scripts::CutsceneSkipVoteState*>(pPacket);
+                    g_mission.maxVoters = std::max(g_mission.maxVoters, p->voters);
+                    g_mission.maxVotes = std::max(g_mission.maxVotes, p->votes);
+                    static bool votedThisCutscene = false;
+                    if (p->votes == 0)
+                        votedThisCutscene = false;  // a new cutscene started
+                    if (args.voteSkip && p->voters > 0 && !votedThisCutscene)
+                    {
+                        votedThisCutscene = true;
+                        g_mission.votesSent++;
+                        Packets::Scripts::CutsceneSkipVote vote{};
+                        SendPacket(vote);
+                    }
+                    PrintMission();
+                    break;
+                }
                 case ePacketType::PLAYER_CHAT_MESSAGE:
                 {
                     auto* p = static_cast<Packets::System::ChatMessage*>(pPacket);
@@ -304,9 +391,17 @@ int main(int argc, char* argv[])
             float a = t * angularSpeed;
 
             Packets::Players::OnFootUpdate update{};
-            update.vecPos = CVector(center.x + radius * cosf(a), center.y + radius * sinf(a), center.z);
-            update.vecMoveSpeed = CVector(-radius * angularSpeed * sinf(a) / 50.0f,
-                radius * angularSpeed * cosf(a) / 50.0f, 0.0f);
+            if (args.stand)
+            {
+                update.vecPos = args.standPos;
+                update.vecMoveSpeed = CVector(0.0f, 0.0f, 0.0f);
+            }
+            else
+            {
+                update.vecPos = CVector(center.x + radius * cosf(a), center.y + radius * sinf(a), center.z);
+                update.vecMoveSpeed = CVector(-radius * angularSpeed * sinf(a) / 50.0f,
+                    radius * angularSpeed * cosf(a) / 50.0f, 0.0f);
+            }
             update.currentRotation = NormalizeRadianAngle(a + PI);
             update.aimingRotation = update.currentRotation;
             SendPacket(update);

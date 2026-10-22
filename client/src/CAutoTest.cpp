@@ -1,5 +1,7 @@
 #include "stdafx.h"
 #include "CAutoTest.h"
+#include "CCutsceneSkipVote.h"
+#include <CMessages.h>
 #include <deque>
 #include <filesystem>
 #include <fstream>
@@ -74,6 +76,13 @@ void CAutoTest::Init()
     char exePath[MAX_PATH];
     GetModuleFileNameA(NULL, exePath, MAX_PATH);
     ms_dir = fs::path(exePath).parent_path() / "CoopAndreas" / "autotest";
+    // -autodir <sub>: separate files per instance when several games run from one folder
+    if (const char* v = GetArg(cmd, "-autodir"))
+    {
+        char sub[64];
+        CopyArg(v, sub, sizeof(sub));
+        ms_dir /= sub;
+    }
     std::error_code ec;
     fs::create_directories(ms_dir, ec);
 
@@ -95,6 +104,83 @@ static std::string Vec(const CVector& v)
     char buf[96];
     snprintf(buf, sizeof(buf), "\"x\":%.1f,\"y\":%.1f,\"z\":%.1f", v.x, v.y, v.z);
     return buf;
+}
+
+// the running mission script on the host (non-hosts only get the on-mission flag)
+static std::string GetMissionScriptName()
+{
+    for (CRunningScript* s = CTheScripts::pActiveScripts; s; s = s->m_pNext)
+    {
+        if (s->m_bIsMission && strncmp(s->m_szName, "coopand", 7) != 0)
+        {
+            char name[9]{};
+            memcpy(name, s->m_szName, 8);
+            return name;
+        }
+    }
+    return "";
+}
+
+// which of the mission result big messages is on screen right now ("" if none)
+static std::string GetMissionResultMessage()
+{
+    static const char* keys[] = {"M_PASS", "M_PASSR", "M_PASSD", "M_PASSS", "M_FAIL"};
+    for (int style = 0; style < 7; style++)
+    {
+        char* text = CMessages::BIGMessages[style].m_Current.m_pText;
+        if (!text)
+            continue;
+        for (const char* key : keys)
+        {
+            if (text == TheText.Get(key))
+                return key;
+        }
+    }
+    return "";
+}
+
+void CAutoTest::DetectMission()
+{
+    static bool onMission = false, cutscene = false;
+    static int votes = -1, voters = -1;
+    static std::string result;
+
+    bool nowOnMission = CTheScripts::OnAMissionFlag && CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag];
+    if (nowOnMission != onMission)
+    {
+        onMission = nowOnMission;
+        if (onMission)
+            Event("mission_started", "\"script\":\"" + JsonEscape(GetMissionScriptName()) + "\",\"host\":" +
+                                         (CLocalPlayer::m_bIsHost ? "true" : "false"));
+        else
+            Event("mission_ended");
+    }
+
+    std::string nowResult = GetMissionResultMessage();
+    if (nowResult != result)
+    {
+        result = nowResult;
+        if (!result.empty())
+            Event(result == "M_FAIL" ? "mission_failed" : "mission_passed", "\"gxt\":\"" + result + "\"");
+    }
+
+    if (CCutsceneMgr::ms_running != cutscene)
+    {
+        cutscene = CCutsceneMgr::ms_running;
+        if (cutscene)
+            Event("cutscene_started", "\"name\":\"" + JsonEscape(std::string(CCutsceneMgr::ms_cutsceneName, 0, 8)) + "\"");
+        else
+            Event("cutscene_ended", std::string("\"skipped\":") + (CCutsceneMgr::ms_wasCutsceneSkipped ? "true" : "false"));
+    }
+
+    if (CCutsceneSkipVote::GetVotes() != votes || CCutsceneSkipVote::GetVoters() != voters)
+    {
+        votes = CCutsceneSkipVote::GetVotes();
+        voters = CCutsceneSkipVote::GetVoters();
+        if (voters > 0)
+            Event("skip_vote_state", "\"votes\":" + std::to_string(votes) + ",\"voters\":" + std::to_string(voters) +
+                                         ",\"voted\":" + (CCutsceneSkipVote::HasVoted() ? "true" : "false"));
+    }
 }
 
 void CAutoTest::DetectChanges()
@@ -221,6 +307,7 @@ void CAutoTest::ProcessGame()
 
     ms_nFrames++;
     DetectChanges();
+    DetectMission();
     ExecuteCommands();
     WriteStatus(true);
 }
@@ -259,6 +346,15 @@ void CAutoTest::WriteStatus(bool inGame)
        << ",\"isHost\":" << (CLocalPlayer::m_bIsHost ? "true" : "false")
        << ",\"name\":\"" << JsonEscape(CLocalPlayer::m_Name) << "\""
        << ",\"rtt\":" << CNetwork::GetRTT() << ",\"fps\":" << fps << ",\"focused\":" << (GetForegroundWindow() == *(HWND*)0xC97C1C ? "true" : "false");  // 0xC97C1C: game window
+
+    if (inGame)
+    {
+        js << ",\"onMission\":"
+           << ((CTheScripts::OnAMissionFlag && CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag]) ? "true" : "false")
+           << ",\"mission\":\"" << JsonEscape(GetMissionScriptName()) << "\""
+           << ",\"cutscene\":\"" << (CCutsceneMgr::ms_running ? JsonEscape(std::string(CCutsceneMgr::ms_cutsceneName, 0, 8)) : "")
+           << "\",\"skipVotes\":" << CCutsceneSkipVote::GetVotes() << ",\"skipVoters\":" << CCutsceneSkipVote::GetVoters();
+    }
 
     CPlayerPed* player = inGame ? FindPlayerPed(0) : nullptr;
     if (player && player->m_matrix)
@@ -403,6 +499,17 @@ void CAutoTest::Execute(const std::string& line)
     else if (verb == "heal")
     {
         player->m_fHealth = player->m_fMaxHealth;
+    }
+    else if (verb == "kill")
+    {
+        player->m_fHealth = 0.0f;
+    }
+    else if (verb == "skipcutscene")
+    {
+        if (CCutsceneMgr::ms_running)
+            CCutsceneSkipVote::PressSkip();
+        else
+            result = "no cutscene";
     }
     else
     {

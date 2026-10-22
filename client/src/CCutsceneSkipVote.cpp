@@ -49,9 +49,19 @@ static bool RemoveDisconnected(std::set<playerid_t>& players)
     return players.size() != oldSize;
 }
 
+static bool bSkipPressRequested = false;
+
+int CCutsceneSkipVote::GetVotes() { return nVotes; }
+int CCutsceneSkipVote::GetVoters() { return nVoters; }
+bool CCutsceneSkipVote::HasVoted() { return bVoted; }
+void CCutsceneSkipVote::PressSkip() { bSkipPressRequested = true; }
+
 static bool CCutsceneMgr__IsCutsceneSkipButtonBeingPressed_Hook()
 {
-    if (!bVoted && CCutsceneMgr::IsCutsceneSkipButtonBeingPressed())
+    bool bPressed = CCutsceneMgr::IsCutsceneSkipButtonBeingPressed() || bSkipPressRequested;
+    bSkipPressRequested = false;
+
+    if (!bVoted && bPressed)
     {
         bVoted = true;
 

@@ -7,7 +7,9 @@
 // - appends what happens (connect, auth, host, players joining/leaving/spawning, chat, cars, interiors, death)
 //   to CoopAndreas\autotest\events.jsonl, so tests can assert on a log instead of screenshots
 // - executes lines appended to CoopAndreas\autotest\commands.txt:
-//     chat <text> | teleport <x> <y> <z> | vehicle <model> | leavevehicle | heal
+//     chat <text> | teleport <x> <y> <z> | vehicle <model> | leavevehicle | heal | kill | skipcutscene
+// - mission events: mission_started/ended/passed/failed, cutscene_started/ended, skip_vote_state
+// - -autodir <sub> writes to CoopAndreas\autotest\<sub> (several games from one folder)
 // testing\ingame-test.ps1 drives this together with headless bots.
 class CAutoTest
 {
@@ -24,6 +26,7 @@ public:
 
 private:
     static void DetectChanges();
+    static void DetectMission();
     static void WriteStatus(bool inGame);
     static void ExecuteCommands();
     static void Execute(const std::string& line);
