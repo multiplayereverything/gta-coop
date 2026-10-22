@@ -2,6 +2,7 @@
 #include "CCustomMenuManager.h"
 #include "CConfigLoader.h"
 #include <CCompatibilityChecker.h>
+#include "CAutoTest.h"
 
 #define SCR_NICKNAME_PORT_IP (70)
 
@@ -262,6 +263,7 @@ void DrawCustomScreen_NicknamePortIp(CMenuManager* This)
 void __fastcall CMenuManager__DrawStandardMenu_Hook(CMenuManager* This, SKIP_EDX, char a1)
 {
 	CCompatibilityChecker::Process();
+	CAutoTest::ProcessMenu(This);
 
 	This->DrawStandardMenu(a1);
 	

@@ -49,6 +49,17 @@ struct SPeer
 static ENetHost* g_pHost = nullptr;
 static ENetPeer* g_pPeer = nullptr;
 static server_time_t g_serverTime = 0;
+
+// same clock sync as the game client (client/src/CServerTime.cpp): the game orders and interpolates
+// remote movement by these timestamps, so they must advance smoothly with real time
+static int32_t g_serverTimeOffset = 0;
+static bool g_bServerTimeKnown = false;
+static uint32_t g_timeRequestTick = 0;
+
+static void RecalculateServerTime()
+{
+    g_serverTime = g_bServerTimeKnown ? GetTickCount() + g_serverTimeOffset : 0;
+}
 static uint8_t g_buffer[10 * 1024];
 
 static void SendPacket(Packet& packet)
@@ -59,7 +70,8 @@ static void SendPacket(Packet& packet)
     stream.SerializeBits(packetType, 16);
     if (packet.GetChannel() != ePacketChannel::SYSTEM)
     {
-        packet.serverTime = g_serverTime;
+        RecalculateServerTime();
+        packet.serverTime = g_serverTime;  // 0 = let the server stamp it
         stream.SerializeBits(packet.serverTime, 32);
     }
     if (!packet.SerializeWrite(stream))
@@ -92,7 +104,6 @@ static Packet* ReadPacket(const uint8_t* data, size_t size)
     {
         if (!stream.SerializeBits(pPacket->serverTime, 32))
             return nullptr;
-        g_serverTime = std::max(g_serverTime, pPacket->serverTime);
     }
 
     if (!pPacket->SerializeRead(stream))
@@ -219,6 +230,22 @@ int main(int argc, char* argv[])
                     logger::info("%s: joined as %s", args.name.c_str(), to_string(myId).c_str());
                     break;
                 }
+                case ePacketType::SERVER_TIME_REQUEST:
+                {
+                    if (g_timeRequestTick == 0)
+                        break;
+                    uint32_t clientTick = GetTickCount();
+                    uint32_t rtt = clientTick - g_timeRequestTick;
+                    uint32_t serverTime =
+                        static_cast<Packets::System::ServerTimeRequest*>(pPacket)->serverTimeRespond + rtt / 2;
+                    int32_t newOffset = static_cast<int32_t>(static_cast<int64_t>(serverTime) - clientTick);
+                    g_serverTimeOffset = g_bServerTimeKnown
+                                             ? g_serverTimeOffset + static_cast<int32_t>(0.1f * (newOffset - g_serverTimeOffset))
+                                             : newOffset;
+                    g_bServerTimeKnown = true;
+                    g_timeRequestTick = 0;
+                    break;
+                }
                 case ePacketType::PLAYER_CONNECTED:
                 {
                     auto* p = static_cast<Packets::System::PlayerConnected*>(pPacket);
@@ -260,6 +287,15 @@ int main(int argc, char* argv[])
 
         if (!myId.valid())
             continue;
+
+        static auto lastTimeRequest = now - std::chrono::seconds(10);
+        if (now - lastTimeRequest >= std::chrono::seconds(1) && g_timeRequestTick == 0)
+        {
+            lastTimeRequest = now;
+            g_timeRequestTick = GetTickCount();
+            Packets::System::ServerTimeRequest request{};
+            SendPacket(request);
+        }
 
         // 20 Hz on-foot sync, like the game client
         if (now - lastSync >= std::chrono::milliseconds(50))

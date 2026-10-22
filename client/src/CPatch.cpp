@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include <Debug/CImGui.h>
 #include <filesystem>
+#include "CAutoTest.h"
 
 // SilentPatch hooks the isAlreadyRunning call at 0x74872D, so we must not nop it when SilentPatch will load.
 // When it sits in modloader/ or scripts/ it is loaded *after* us, so GetModuleHandle alone misses it.
@@ -484,6 +485,34 @@ void PatchSCM()
     // hook script.img loading
     CStreaming__AddImageToList_ptr = injector::GetBranchDestination(0x5B915B).as_int();
     patch::RedirectCall(0x5B915B, CStreaming__AddImageToList_Hook);
+}
+
+static uintptr_t ms_gameProcessHook = 0x0;
+
+void CPatch::RememberGameProcessHook()
+{
+    ms_gameProcessHook = injector::GetBranchDestination(0x53E981).as_int();
+}
+
+void CPatch::ReclaimGameProcessHook()
+{
+    uintptr_t current = injector::GetBranchDestination(0x53E981).as_int();
+    if (ms_gameProcessHook == 0x0 || current == ms_gameProcessHook)
+    {
+        return;
+    }
+
+    char moduleName[MAX_PATH] = "unknown";
+    HMODULE hOwner = nullptr;
+    if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+            (LPCSTR)current, &hOwner))
+    {
+        GetModuleFileNameA(hOwner, moduleName, sizeof(moduleName));
+    }
+    logger::warn("CGame::Process hook was taken by %s, restoring CoopAndreas hook", moduleName);
+    CAutoTest::Event("hook_reclaimed", "\"site\":\"0x53E981\"");
+
+    patch::RedirectCall(0x53E981, (void*)ms_gameProcessHook);
 }
 
 static uintptr_t InitInstance_ptr = 0x0;

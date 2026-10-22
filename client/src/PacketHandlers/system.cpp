@@ -6,6 +6,7 @@
 #include <CWeatherSync.h>
 #include <CMoonSync.h>
 #include <game_sa/CTagManager.h>
+#include "CAutoTest.h"
 
 PACKET_HANDLER(ePacketType::PLAYER_CONNECTED, Packets::System::PlayerConnected* pPlayerConnected)
 {
@@ -137,5 +138,6 @@ PACKET_HANDLER(ePacketType::PLAYER_CHAT_MESSAGE, Packets::System::ChatMessage* p
     if (player)
     {
         CChat::AddPlayerChatMessage(player->GetName().c_str(), pChatMessage->message);
+        CAutoTest::OnChatMessage(player->GetName().c_str(), pChatMessage->message);
     }
 }

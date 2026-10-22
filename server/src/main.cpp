@@ -34,6 +34,8 @@ int main(int argc, char* argv[])
 #if defined(_WIN32)
     SetConsoleTitleW(L"CoopAndreas Server");
 #endif
+    // unbuffered, so a redirected log (testing\lab.ps1) is readable while the server runs
+    setvbuf(stdout, nullptr, _IONBF, 0);
 
     std::filesystem::path exeDir = GetExecutableDir();
     std::error_code ec;

@@ -30,6 +30,7 @@
 #include <CCompatibilityChecker.h>
 #include <CWeatherSync.h>
 #include <network/packets/scripts.h>
+#include "CAutoTest.h"
 
 unsigned int lastOnFootSyncTickRate = 0;
 unsigned int lastDriverSyncTickRate = 0;
@@ -82,6 +83,7 @@ public:
             CEntryExitTransitionSync::Process();
             CDiscordRPCMgr::Update();
             CDebugVehicleSpawner::Process();
+            CAutoTest::ProcessGame();
 
             if (/*CNetwork::m_bConnected*/ CNetwork::m_bAuthenticated)
             {

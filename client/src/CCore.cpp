@@ -7,6 +7,7 @@
 #include <winuser.h>
 #include <CLaunchManager.h>
 #include <Debug/CImGui.h>
+#include "CAutoTest.h"
 
 semver_t CCore::Version;
 
@@ -41,6 +42,7 @@ void InitWndProc()
 uintptr_t WinMain_AfterWindowInit_ptr = 0x0;
 void WinMain_AfterWindowInit()
 {
+    CPatch::ReclaimGameProcessHook();  // every ASI is loaded by now
     InitWndProc();
     plugin::CallDyn(WinMain_AfterWindowInit_ptr);
 }
@@ -61,6 +63,8 @@ void CCore::Init()
         }
     }
 
+    CAutoTest::Init();
+
     gvm.Detect();
 #ifdef _DEV
     CCore::AllocateConsole();
@@ -76,8 +80,11 @@ void CCore::Init()
     CDXFont::Init();
     CDiscordRPC::Init();
     COpCodeSync::Init();
+    // Main.cpp registered the gameProcessEvent handlers before calling us, so the hook is installed now
+    CPatch::RememberGameProcessHook();
     Events::initGameEvent.after += []
     {
+        CPatch::ReclaimGameProcessHook();
         CPatch::TemporaryPatches();
         // init CNetworking async
         CNetwork::Start();
