@@ -444,12 +444,9 @@ HWND InitInstance_Hook(HINSTANCE hInstance)
 {
     auto result = plugin::CallAndReturnDyn<HWND>(InitInstance_ptr, hInstance);
 
-    int x = 0;
-    int y = 0;
-    if (CCore::ms_nRunIndex == 1)
-    {
-        x = 848;
-    }
+    // tile up to 4 debug instances in a 2x2 grid
+    int x = (CCore::ms_nRunIndex % 2) * 848;
+    int y = (CCore::ms_nRunIndex / 2) * 500;
     SetWindowPos(result, 0, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
     return result;
 }

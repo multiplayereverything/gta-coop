@@ -7,6 +7,7 @@ struct Config
 {
     static constexpr uint16_t DEFAULT_PORT = 6767;
     static constexpr uint16_t MAX_SERVER_PLAYERS = 8;
+    static constexpr uint16_t DEFAULT_SERVER_PLAYERS = 4;  // server-config.ini `maxplayers`, capped by the above
     static constexpr uint16_t MAX_SERVER_VEHICLES = 255;
     static constexpr uint16_t MAX_SERVER_PEDS = 255;
     static constexpr uint16_t MAX_NICKNAME_LENGTH = 24;

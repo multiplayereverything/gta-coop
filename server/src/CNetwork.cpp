@@ -23,9 +23,10 @@ bool CNetwork::Init(unsigned short port)
     address.host = ENET_HOST_ANY;  // bind server ip
     address.port = port;           // bind server port
 
-    // TODO: `ConfigManager::GetConfigMaxPlayers`
+    // ENet refuses connections once every peer slot is taken, which is how the player cap is enforced
+    uint16_t maxPlayers = std::clamp<uint16_t>(CConfigManager::GetConfigMaxPlayers(), 1, Config::MAX_SERVER_PLAYERS);
     ENetHost* pENetHost =
-        enet_host_create(&address, Config::MAX_SERVER_PLAYERS, (int)ePacketChannel::COUNT, 0, 0);  // create enet host
+        enet_host_create(&address, maxPlayers, (int)ePacketChannel::COUNT, 0, 0);  // create enet host
 
     if (pENetHost == nullptr)
     {
@@ -33,7 +34,7 @@ bool CNetwork::Init(unsigned short port)
         return false;
     }
 
-    printf("[!] : Server started on port %d\n", port);
+    printf("[!] : Server started on port %d, max players %d\n", port, maxPlayers);
 
     ENetEvent eNetEvent{};
     while (true)  // waiting for event

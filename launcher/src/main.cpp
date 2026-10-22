@@ -112,6 +112,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
     ComputerID serialPC{};
     sSerial = serialPC.GetUniqueSystemId();
     sSerialCommand = "/gen " + sSerial;
+    // lets testing\test-local.ps1 start extra game instances without going through this dialog
+    Registry::SetField(sSerial.c_str(), "PcId");
 
     DialogBoxParam(hInstance, MAKEINTRESOURCE(IDD_DIALOG1), nullptr, DialogProc, 0);
     return 0;

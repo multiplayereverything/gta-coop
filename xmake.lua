@@ -155,6 +155,39 @@ target("server", function ()
     end
 end)
 
+-- headless fake player used by testing/run-tests.ps1
+target("testbot", function ()
+    set_kind("binary")
+
+    set_arch("x86")
+    set_languages("c++17")
+    set_basename("CoopAndreasBot")
+
+    add_files("testbot/src/*.cpp")
+    add_headerfiles("testbot/src/*.h")
+
+    add_includedirs(
+        "testbot/src/",
+        "third_party/plugin-sdk/shared",
+        "third_party/plugin-sdk/shared/game",
+        "third_party/plugin-sdk/plugin_sa",
+        "third_party/plugin-sdk/plugin_sa/game_sa"
+    )
+    add_includedirs("shared", "third_party")
+
+    add_defines("COOP_CLIENT", "NOMINMAX", "GTASA", "_CRT_SECURE_NO_WARNINGS", "_USE_MATH_DEFINES")
+
+    if is_mode("debug") then
+        set_optimize("none")
+        set_symbols("debug")
+    else
+        set_optimize("fastest")
+    end
+
+    add_deps("enet")
+    add_syslinks("ws2_32", "winmm")
+end)
+
 target("proxy", function ()
     set_kind("shared")
 

@@ -50,15 +50,15 @@ void CCore::Init()
     CCrashLog::ms_lpPreviousFilter = SetUnhandledExceptionFilter(CCrashLog::ExceptionHandler);
 
     LPTSTR cmd = GetCommandLine();
-    if (strstr(cmd, "--coopd0") != nullptr)
+    // --coopd0 .. --coopd3: local multi-instance debug run, the digit picks the window slot
+    if (const char* debugArg = strstr(cmd, "--coopd"))
     {
-        ms_bDebug = true;
-        ms_nRunIndex = 0;
-    }
-    if (strstr(cmd, "--coopd1") != nullptr)
-    {
-        ms_bDebug = true;
-        ms_nRunIndex = 1;
+        char slot = debugArg[7];
+        if (slot >= '0' && slot <= '3')
+        {
+            ms_bDebug = true;
+            ms_nRunIndex = slot - '0';
+        }
     }
 
     gvm.Detect();

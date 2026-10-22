@@ -5,7 +5,13 @@
 
 void CConfigLoader::BuildPath()
 {
-    ms_sDataPath = std::string((const char*)0xC92368) + "\\" + CONFIG_FILE_NAME;  // 0xC92368 - gta_user_dir_path var
+    ms_sDataPath = std::string((const char*)0xC92368) + "\\";  // 0xC92368 - gta_user_dir_path var
+    if (CCore::ms_bDebug)
+    {
+        // each local debug instance keeps its own nickname/ip, otherwise they all join with the same name
+        ms_sDataPath += "coopd" + std::to_string(CCore::ms_nRunIndex) + "_";
+    }
+    ms_sDataPath += CONFIG_FILE_NAME;
 }
 
 void CConfigLoader::BuildDefaultConfig()
