@@ -191,6 +191,17 @@ target("testbot", function ()
     add_syslinks("ws2_32", "winmm")
 end)
 
+-- UDP relay that adds delay/jitter/loss, for testing internet-like conditions on one PC (testing/lab-duo.ps1 -Net)
+target("netsim", function ()
+    set_kind("binary")
+    set_arch("x86")
+    set_languages("c++17")
+    set_basename("CoopAndreasNetSim")
+    add_files("testbot/netsim/main.cpp")
+    add_syslinks("ws2_32")
+    set_optimize("fastest")
+end)
+
 target("proxy", function ()
     set_kind("shared")
 

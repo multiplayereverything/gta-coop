@@ -1,7 +1,7 @@
 //-------------Mission 26---------------
 // Originally: Robbing Uncle Sam
-Coop.AddChatMessage("{ffff00}[CoopAndreas Warning]{ffffff} This mission is not fully ported yet: the host drives it.")
-Coop.AddChatMessage("{ffff00}[CoopAndreas Warning]{ffffff} Partners get texts, cutscenes, money and wanted level; some objectives are host-only.")
+Coop.AddChatMessage("{63c7e8}[CoopAndreas]{ffffff} Host-driven mission: the host plays the objectives, partners help.")
+Coop.AddChatMessage("{63c7e8}[CoopAndreas]{ffffff} Everyone gets the texts, cutscenes, money and wanted level.")
 
 
 :RYDER2
