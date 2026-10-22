@@ -12,7 +12,8 @@ int CCutscenePlayerHider::GetHiddenCount()
 
 void CCutscenePlayerHider::Process()
 {
-    bool hide = CCutsceneMgr::ms_running || TheCamera.m_bWideScreenOn;
+    // widescreen alone is not enough: only hide in scripted scenes where the player has no control
+    bool hide = CCutsceneMgr::ms_running || (TheCamera.m_bWideScreenOn && CPad::GetPad(0)->DisablePlayerControls);
 
     if (hide)
     {

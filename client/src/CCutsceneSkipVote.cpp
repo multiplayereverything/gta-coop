@@ -2,6 +2,7 @@
 #include "CCutsceneSkipVote.h"
 #include <set>
 #include "CHudColours.h"
+#include "CAutoTest.h"
 
 // shared state, shown to everyone
 static int nVotes = 0;
@@ -58,7 +59,9 @@ void CCutsceneSkipVote::PressSkip() { bSkipPressRequested = true; }
 
 static bool CCutsceneMgr__IsCutsceneSkipButtonBeingPressed_Hook()
 {
-    bool bPressed = CCutsceneMgr::IsCutsceneSkipButtonBeingPressed() || bSkipPressRequested;
+    // in --autotest only the test's own presses count: real clicks/keys on the PC (the game reads them even
+    // unfocused) made the host vote on its own and broke the vote checks
+    bool bPressed = (!CAutoTest::ms_bEnabled && CCutsceneMgr::IsCutsceneSkipButtonBeingPressed()) || bSkipPressRequested;
     bSkipPressRequested = false;
 
     if (!bVoted && bPressed)
