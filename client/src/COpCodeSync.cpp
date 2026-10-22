@@ -44,6 +44,8 @@
 const SSyncedOpCode syncedOpcodes[] = {
     // Messages
     {0x00BA},  // print_big {key} [gxt_key] {time} [int] {style} [TextStyle]
+    {0x00BB},  // print {key} [gxt_key] {time} [int] {flag} [int]             (unported missions only, see below)
+    {0x00BC},  // print_now {key} [gxt_key] {time} [int] {flag} [int]         (unported missions only, see below)
     {0x00BE},  // clear_prints
     {0x01E3},  // print_with_number_big {key} [gxt_key] {num} [int] {duration} [int] {style}[TextStyle]
     {0x0318},  // register_mission_passed {key} [gxt_key]
@@ -196,6 +198,10 @@ const SSyncedOpCode syncedOpcodes[] = {
     // Controls
     {0x01B4, true, {eSyncedParamType::PLAYER}},  // set_player_control[Player] {state}[bool]
     {COMMAND_ADD_SCORE, true, {eSyncedParamType::PLAYER}},
+    // wanted level, unported missions only (shared with every player, see IsSharedPlayerOpcode)
+    {COMMAND_ALTER_WANTED_LEVEL, true, {eSyncedParamType::PLAYER}},
+    {COMMAND_ALTER_WANTED_LEVEL_NO_DROP, true, {eSyncedParamType::PLAYER}},
+    {COMMAND_CLEAR_WANTED_LEVEL, true, {eSyncedParamType::PLAYER}},
 
     {COMMAND_REQUEST_MODEL}};
 
@@ -251,12 +257,67 @@ bool COpCodeSync::IsScriptSynced(CRunningScript* script)
     return false;
 }
 
+// Missions not ported to coop yet (no Coop.EnableSyncingThisScript) still run on the host. Syncing just their
+// texts and cutscenes lets the other players follow the objectives, see the pass/fail banner and vote to skip
+// cutscenes (the vote waits for every player, so without this the host could never skip).
+static bool IsUnportedMissionFallbackOpcode(int opcode)
+{
+    switch (opcode)
+    {
+        case 0x00BA:  // print_big
+        case 0x00BB:  // print
+        case 0x00BC:  // print_now
+        case 0x00BE:  // clear_prints
+        case 0x01E3:  // print_with_number_big
+        case 0x0318:  // register_mission_passed
+        case 0x03E5:  // print_help
+        case 0x054C:  // load_mission_text, clients need the GXT table for the texts above
+        case 0x016A:  // do_fade
+        case 0x02A3:  // switch_widescreen
+        case 0x02E4:  // load_cutscene
+        case 0x02E7:  // start_cutscene
+        case 0x02EA:  // clear_cutscene
+        case COMMAND_ADD_SCORE:
+        case COMMAND_ALTER_WANTED_LEVEL:
+        case COMMAND_ALTER_WANTED_LEVEL_NO_DROP:
+        case COMMAND_CLEAR_WANTED_LEVEL:
+            return true;
+    }
+    return false;
+}
+
+// money and wanted level of an unported mission go to *every* player: the host's own player parameter ($player1)
+// is sent as plain 0, which each client reads as its own local player
+static bool IsSharedPlayerOpcode(int opcode)
+{
+    return opcode == COMMAND_ADD_SCORE || opcode == COMMAND_ALTER_WANTED_LEVEL ||
+           opcode == COMMAND_ALTER_WANTED_LEVEL_NO_DROP || opcode == COMMAND_CLEAR_WANTED_LEVEL;
+}
+
+static bool IsUnportedMissionScript(CRunningScript* script)
+{
+    // "coopand" is the fake script that runs opcodes received from the network
+    return script && script->m_bIsMission && strncmp(script->m_szName, "coopand", 7) != 0;
+}
+
 /// <param name="opcodeIdx">syncedOpcodes index</param>
 bool COpCodeSync::IsOpcodeSyncable(int opcode, int* opcodeIdx, bool ignoreOpCodeSync)
 {
     bool bScriptSynced = IsScriptSynced(lastProcessedScript);
 
-    if (((CLocalPlayer::m_bIsHost && ms_bSyncingEnabled) && bScriptSynced) || ignoreOpCodeSync ||
+    // ported scripts send print/print_now per player themselves (Coop.PrintNowForNetworkPlayer),
+    // and their wanted level stays as upstream had it (unsynced)
+    if (bScriptSynced && !ignoreOpCodeSync &&
+        (opcode == 0x00BB || opcode == 0x00BC || opcode == COMMAND_ALTER_WANTED_LEVEL ||
+            opcode == COMMAND_ALTER_WANTED_LEVEL_NO_DROP || opcode == COMMAND_CLEAR_WANTED_LEVEL))
+    {
+        return false;
+    }
+
+    bool bUnportedFallback = CLocalPlayer::m_bIsHost && ms_bSyncingEnabled && !bScriptSynced &&
+                             IsUnportedMissionScript(lastProcessedScript) && IsUnportedMissionFallbackOpcode(opcode);
+
+    if (((CLocalPlayer::m_bIsHost && ms_bSyncingEnabled) && bScriptSynced) || ignoreOpCodeSync || bUnportedFallback ||
         CTaskSequenceSync::IsOpCodeTaskSynced((eScriptCommands)opcode))
     {
         for (int i = 0; i < ARRAY_SIZE(syncedOpcodes); ++i)
@@ -397,6 +458,9 @@ static const uint8_t* ReadParam(
 
 std::vector<uint8_t> COpCodeSync::SerializeOpcode(int idx, int& outSize)
 {
+    bool bShareWithEveryone = IsSharedPlayerOpcode(lastOpCodeProcessed) && !IsScriptSynced(lastProcessedScript) &&
+                              IsUnportedMissionScript(lastProcessedScript);
+
     for (int i = 0; i < scriptParamCount; i++)
     {
         if (!IsEntityParam(idx, i))
@@ -405,6 +469,12 @@ std::vector<uint8_t> COpCodeSync::SerializeOpcode(int idx, int& outSize)
         }
 
         OpcodeParameter& param = scriptParamsBuffer[i];
+
+        if (bShareWithEveryone && syncedOpcodes[idx].m_aParamTypes[i] == eSyncedParamType::PLAYER && param.value == 0)
+        {
+            param.SetValue(0);  // stays type NONE: each receiver runs it on its own $player1
+            continue;
+        }
 
         // CChat::AddMessage("Parsing complex opcode %04x parameter %d...", lastOpCodeProcessed, i);
         switch (syncedOpcodes[idx].m_aParamTypes[i])

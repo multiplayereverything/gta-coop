@@ -55,8 +55,41 @@ struct SMissionLog
     int maxVoters = 0;
     int maxVotes = 0;
     int votesSent = 0;
-    std::string gxt;             // texts the host printed for us, space separated
+    std::string gxt;             // texts the host printed for us, space separated (first ~200 chars)
+    int texts = 0;               // every mission text received (GXT packets + print opcodes), cumulative
+    int passBanners = 0;         // M_PASS* received
+    int failBanners = 0;         // M_FAIL received
+    int cutscenes = 0;           // start_cutscene opcodes received
+    int teleports = 0;           // TELEPORT_PLAYER_SCRIPTED for us
 };
+
+static void AddText(SMissionLog& log, const char* key)
+{
+    log.texts++;
+    if (strncmp(key, "M_PASS", 6) == 0)
+        log.passBanners++;
+    if (strcmp(key, "M_FAIL") == 0)
+        log.failBanners++;
+    if (log.gxt.size() < 200)
+        log.gxt += std::string(log.gxt.empty() ? "" : " ") + key;
+}
+
+// first string parameter of a synced opcode, see COpCodeSync::SerializeOpcode (header, ints, then len+text strings)
+static std::string OpcodeFirstString(const uint8_t* buffer, int size)
+{
+    const int headerSize = 4;  // sizeof(OpcodeSyncHeader) with padding
+    if (size < headerSize)
+        return "";
+    int intCount = buffer[2] & 0x0F;
+    int stringCount = buffer[2] >> 4;
+    int offset = headerSize + intCount * 4;  // print opcodes carry no entity params
+    if (stringCount < 1 || offset >= size)
+        return "";
+    int len = buffer[offset];
+    if (offset + 1 + len > size)
+        return "";
+    return std::string((const char*)buffer + offset + 1, len);
+}
 
 struct SPeer
 {
@@ -169,10 +202,12 @@ static SMissionLog g_mission;
 static void PrintMission()
 {
     printf("MISSION {\"onMissionFlags\":\"%s\",\"opcodes\":%d,\"loadCutscene\":%s,\"startCutscene\":%s,"
-           "\"clearCutscene\":%s,\"maxVoters\":%d,\"maxVotes\":%d,\"votesSent\":%d,\"gxt\":\"%s\"}\n",
+           "\"clearCutscene\":%s,\"maxVoters\":%d,\"maxVotes\":%d,\"votesSent\":%d,\"texts\":%d,\"passBanners\":%d,"
+           "\"failBanners\":%d,\"cutscenes\":%d,\"teleports\":%d,\"gxt\":\"%s\"}\n",
         g_mission.onMissionFlags.c_str(), g_mission.opcodes, g_mission.loadCutscene ? "true" : "false",
         g_mission.startCutscene ? "true" : "false", g_mission.clearCutscene ? "true" : "false", g_mission.maxVoters,
-        g_mission.maxVotes, g_mission.votesSent, g_mission.gxt.c_str());
+        g_mission.maxVotes, g_mission.votesSent, g_mission.texts, g_mission.passBanners, g_mission.failBanners,
+        g_mission.cutscenes, g_mission.teleports, g_mission.gxt.c_str());
 }
 
 static void PrintResult(const SArgs& args, bool pass, const char* status, playerid_t myId,
@@ -331,15 +366,36 @@ int main(int argc, char* argv[])
                     g_mission.loadCutscene |= opcode == 0x02E4;
                     g_mission.startCutscene |= opcode == 0x02E7;
                     g_mission.clearCutscene |= opcode == 0x02EA;
-                    if (opcode == 0x02E4 || opcode == 0x02E7 || opcode == 0x02EA)
+                    if (opcode == 0x02E7)
+                        g_mission.cutscenes++;
+                    bool isPrint = opcode == 0x00BA || opcode == 0x00BB || opcode == 0x00BC || opcode == 0x01E3 ||
+                                   opcode == 0x03E5;
+                    if (isPrint)
+                    {
+                        std::string key = OpcodeFirstString(p->buffer, p->size);
+                        if (!key.empty())
+                            AddText(g_mission, key.c_str());
+                    }
+                    if (isPrint || opcode == 0x02E4 || opcode == 0x02E7 || opcode == 0x02EA)
                         PrintMission();
+                    break;
+                }
+                case ePacketType::TELEPORT_PLAYER_SCRIPTED:
+                {
+                    // the host moves players for the mission (Coop.TeleportPlayersToHostSafely), follow it
+                    auto* p = static_cast<Packets::Scripts::TeleportPlayerScripted*>(pPacket);
+                    if (p->playerid == myId && args.stand)
+                    {
+                        args.standPos = p->pos;
+                        g_mission.teleports++;
+                        PrintMission();
+                    }
                     break;
                 }
                 case ePacketType::ADD_MESSAGE_GXT:
                 {
                     auto* p = static_cast<Packets::Scripts::AddMessageGXT*>(pPacket);
-                    if (g_mission.gxt.size() < 200)
-                        g_mission.gxt += std::string(g_mission.gxt.empty() ? "" : " ") + p->gxt;
+                    AddText(g_mission, p->gxt);
                     PrintMission();
                     break;
                 }

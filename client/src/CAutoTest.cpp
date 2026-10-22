@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "CAutoTest.h"
 #include "CCutsceneSkipVote.h"
+#include "COpCodeSync.h"
 #include <CMessages.h>
 #include <deque>
 #include <filesystem>
@@ -107,18 +108,24 @@ static std::string Vec(const CVector& v)
 }
 
 // the running mission script on the host (non-hosts only get the on-mission flag)
-static std::string GetMissionScriptName()
+static CRunningScript* FindMissionScript()
 {
     for (CRunningScript* s = CTheScripts::pActiveScripts; s; s = s->m_pNext)
     {
         if (s->m_bIsMission && strncmp(s->m_szName, "coopand", 7) != 0)
-        {
-            char name[9]{};
-            memcpy(name, s->m_szName, 8);
-            return name;
-        }
+            return s;
     }
-    return "";
+    return nullptr;
+}
+
+static std::string GetMissionScriptName()
+{
+    CRunningScript* s = FindMissionScript();
+    if (!s)
+        return "";
+    char name[9]{};
+    memcpy(name, s->m_szName, 8);
+    return name;
 }
 
 // which of the mission result big messages is on screen right now ("" if none)
@@ -143,7 +150,17 @@ void CAutoTest::DetectMission()
 {
     static bool onMission = false, cutscene = false;
     static int votes = -1, voters = -1;
-    static std::string result;
+    static std::string result, script;
+
+    // the mission script names itself a moment after it launches
+    std::string nowScript = GetMissionScriptName();
+    if (nowScript != script)
+    {
+        script = nowScript;
+        if (!script.empty())
+            Event("mission_script", "\"script\":\"" + JsonEscape(script) + "\",\"synced\":" +
+                                        (COpCodeSync::IsScriptSynced(FindMissionScript()) ? "true" : "false"));
+    }
 
     bool nowOnMission = CTheScripts::OnAMissionFlag && CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag];
     if (nowOnMission != onMission)
@@ -364,7 +381,8 @@ void CAutoTest::WriteStatus(bool inGame)
         js << ",\"local\":{\"x\":" << p.x << ",\"y\":" << p.y << ",\"z\":" << p.z
            << ",\"health\":" << player->m_fHealth << ",\"inVehicle\":" << (inVehicle ? "true" : "false")
            << ",\"vehicleModel\":" << (inVehicle ? player->m_pVehicle->m_nModelIndex : 0)
-           << ",\"interior\":" << (int)player->m_nAreaCode << "}";
+           << ",\"interior\":" << (int)player->m_nAreaCode << ",\"money\":" << CWorld::Players[0].m_nMoney
+           << ",\"wanted\":" << (FindPlayerWanted(0) ? (int)FindPlayerWanted(0)->m_nWantedLevel : 0) << "}";
     }
 
     js << ",\"players\":[";
@@ -503,6 +521,24 @@ void CAutoTest::Execute(const std::string& line)
     else if (verb == "kill")
     {
         player->m_fHealth = 0.0f;
+    }
+    else if (verb == "startmission")
+    {
+        // what a mission trigger does after its marker check (e.g. scm/scripts/INT.txt)
+        int id = -1;
+        in >> id;
+        if (!CLocalPlayer::m_bIsHost)
+            result = "not host";
+        else if (CTheScripts::OnAMissionFlag && CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag])
+            result = "already on a mission";
+        // all missions share one code block in ScriptSpace: launching while another mission script runs
+        // (e.g. INITIAL right after a new game) overwrites its code and crashes on a garbage opcode
+        else if (FindMissionScript())
+            result = "mission script running: " + GetMissionScriptName();
+        else if (id < 0)
+            result = "usage: startmission <id>";
+        else
+            Command<Commands::LOAD_AND_LAUNCH_MISSION_INTERNAL>(id);
     }
     else if (verb == "skipcutscene")
     {

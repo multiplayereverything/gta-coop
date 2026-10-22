@@ -100,6 +100,9 @@ target("client", function()
     add_deps("discordrpc")
 
     add_links("d3dx9") -- TODO STATIC
+
+    -- map file to resolve crash addresses (CoopAndreasSA.dll+0x....) to functions
+    add_shflags("/MAP:build/CoopAndreasSA.map", {force = true})
 end)
 
 target("server", function ()
