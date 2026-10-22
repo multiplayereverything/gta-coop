@@ -584,7 +584,13 @@ void CAutoTest::Execute(const std::string& line)
         else if (id < 0)
             result = "usage: startmission <id>";
         else
+        {
+            // triggers set $onmission = 1 before launching (scm/scripts/INT.txt); some missions only set it late
+            // (Ran Fa Li, Ice Cold Killa) or never (Black Project, Grove 4 Life)
+            if (CTheScripts::OnAMissionFlag)
+                CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag] = 1;
             Command<Commands::LOAD_AND_LAUNCH_MISSION_INTERNAL>(id);
+        }
     }
     else if (verb == "skipcutscene")
     {
