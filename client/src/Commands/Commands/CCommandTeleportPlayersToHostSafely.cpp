@@ -35,12 +35,14 @@ static void CalculateSafePositions(CVector& targetPos, float targetHeading, int 
 	}
 }
 
+static void TeleportToHost(CNetworkPlayer** networkPlayers, int playerCount);
+
 void CCommandTeleportPlayersToHostSafely::Process(CRunningScript* script)
 {
 	script->CollectParameters(3);
 
 	assert(CLocalPlayer::m_bIsHost);
-	
+
 	int playerCount = 0;
 	CNetworkPlayer* networkPlayers[MAX_TELEPORT_SLOTS];
 	for (int i = 0; i < MAX_TELEPORT_SLOTS; i++)
@@ -58,6 +60,48 @@ void CCommandTeleportPlayersToHostSafely::Process(CRunningScript* script)
 		}
 	}
 
+	TeleportToHost(networkPlayers, playerCount);
+}
+
+static bool bFarPartnersTeleportPending = false;
+static uint32_t nLastFarPartnersTeleport = 0;
+
+void CCommandTeleportPlayersToHostSafely::RequestFarPartnersTeleport()
+{
+	bFarPartnersTeleportPending = true;
+}
+
+void CCommandTeleportPlayersToHostSafely::ProcessPendingTeleport()
+{
+	// one frame later, so the host position set by the script is applied
+	if (!bFarPartnersTeleportPending || !CLocalPlayer::m_bIsHost || GetTickCount() - nLastFarPartnersTeleport < 5000)
+		return;
+	bFarPartnersTeleportPending = false;
+
+	static constexpr float FAR_DISTANCE = 50.0f;
+	CPlayerPed* host = FindPlayerPed(0);
+	if (!host || host->m_nPedFlags.bInVehicle || CCutsceneMgr::ms_running)
+		return;
+
+	int playerCount = 0;
+	CNetworkPlayer* networkPlayers[MAX_TELEPORT_SLOTS];
+	for (auto networkPlayer : CNetworkPlayerManager::m_pPlayers)
+	{
+		if (playerCount < MAX_TELEPORT_SLOTS && networkPlayer->m_pPed &&
+			(networkPlayer->m_pPed->GetPosition() - host->GetPosition()).Magnitude() > FAR_DISTANCE)
+		{
+			networkPlayers[playerCount++] = networkPlayer;
+		}
+	}
+	if (playerCount > 0)
+	{
+		nLastFarPartnersTeleport = GetTickCount();
+		TeleportToHost(networkPlayers, playerCount);
+	}
+}
+
+static void TeleportToHost(CNetworkPlayer** networkPlayers, int playerCount)
+{
 	if (playerCount == 0) return;
 
 	CVector positions[MAX_TELEPORT_SLOTS];

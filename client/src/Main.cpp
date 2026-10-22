@@ -31,6 +31,7 @@
 #include <CWeatherSync.h>
 #include <network/packets/scripts.h>
 #include "CAutoTest.h"
+#include "Commands/Commands/CCommandTeleportPlayersToHostSafely.h"
 
 unsigned int lastOnFootSyncTickRate = 0;
 unsigned int lastDriverSyncTickRate = 0;
@@ -114,6 +115,12 @@ public:
                 {
                     lastOnMissionFlag = CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag];
 
+                    if (lastOnMissionFlag)
+                    {
+                        // partners far away when the mission starts are brought to the host
+                        CCommandTeleportPlayersToHostSafely::RequestFarPartnersTeleport();
+                    }
+
                     Packets::Scripts::OnMissionFlagSync packet{};
                     packet.bOnMission = CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag];
                     GetPacketFactory().Send(packet);
@@ -122,6 +129,7 @@ public:
                 unsigned int tickCount = GetTickCount();
 
                 CPassengerEnter::Process();
+                CCommandTeleportPlayersToHostSafely::ProcessPendingTeleport();
 
                 CPlayerPed* localPlayer = FindPlayerPed(0);
 

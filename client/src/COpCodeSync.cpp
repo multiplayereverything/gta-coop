@@ -39,6 +39,7 @@
 #include "CRadarSync.h"
 #include <CTaskSequenceSync.h>
 #include <CNetworkAnimQueue.h>
+#include "Commands/Commands/CCommandTeleportPlayersToHostSafely.h"
 
 // Keep sorted!
 const SSyncedOpCode syncedOpcodes[] = {
@@ -641,6 +642,14 @@ void BuildAndSendOpcode()
         return;
     }
 
+    // an unported mission moved the host (set_char_coordinates on the host's ped): bring far partners along.
+    // ScriptParams still holds what the opcode collected, [0] is the ped handle
+    if (lastOpCodeProcessed == 0x00A1 && CLocalPlayer::m_bIsHost && IsUnportedMissionScript(lastProcessedScript) &&
+        !COpCodeSync::IsScriptSynced(lastProcessedScript) && CPools::GetPed(ScriptParams[0]) == FindPlayerPed(0))
+    {
+        CCommandTeleportPlayersToHostSafely::RequestFarPartnersTeleport();
+    }
+
     switch (lastOpCodeProcessed)
     {
         case 0xD8:
@@ -657,6 +666,26 @@ void BuildAndSendOpcode()
     int idx = 0;
     if (!COpCodeSync::IsOpcodeSyncable(lastOpCodeProcessed, &idx))
         return;
+
+    // some unported missions print the same text every frame: send a given print once per 2 s
+    if ((lastOpCodeProcessed == 0x00BB || lastOpCodeProcessed == 0x00BC || lastOpCodeProcessed == 0x03E5) &&
+        !COpCodeSync::IsScriptSynced(lastProcessedScript) && textParamCount > 0)
+    {
+        static char lastKey[8]{};
+        static uint32_t lastOpcode = 0, lastSent = 0;
+        uint32_t now = GetTickCount();
+        if (lastOpcode == lastOpCodeProcessed && strncmp(lastKey, textParamBuffer[0], 7) == 0 && now - lastSent < 2000)
+        {
+            memset(textParamBuffer, 0, sizeof textParamBuffer);
+            memset(textLengthBuffer, 0, sizeof textLengthBuffer);
+            scriptParamCount = 0;
+            textParamCount = 0;
+            return;
+        }
+        strncpy_s(lastKey, textParamBuffer[0], 7);
+        lastOpcode = lastOpCodeProcessed;
+        lastSent = now;
+    }
 
     int dataSize = 0;
     std::vector<uint8_t> buffer = COpCodeSync::SerializeOpcode(idx, dataSize);

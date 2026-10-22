@@ -3,8 +3,8 @@
 
 :SWEET6
 script_name 'SWEET6'
-Coop.AddChatMessage("{ffff00}[CoopAndreas Warning]{ffffff} This mission is currently unsupported and not recommended to play!")
-Coop.AddChatMessage("{ffff00}[CoopAndreas Warning]{ffffff} It may cause desyncs, crashes, or other unexpected behavior!")
+Coop.AddChatMessage("{ffff00}[CoopAndreas Warning]{ffffff} This mission is not fully ported yet: the host drives it.")
+Coop.AddChatMessage("{ffff00}[CoopAndreas Warning]{ffffff} Partners get texts, cutscenes, money and wanted level; some objectives are host-only.")
 
 gosub @SWEET6_47
 if 
