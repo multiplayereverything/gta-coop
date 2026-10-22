@@ -107,12 +107,17 @@ static std::string Vec(const CVector& v)
     return buf;
 }
 
-// the running mission script on the host (non-hosts only get the on-mission flag)
+// the running mission script on the host (non-hosts only get the on-mission flag). Also counts helper scripts a
+// mission started (not flagged m_bIsMission) whose code lives in the mission block (ScriptSpace + 200000,
+// 69000 bytes): launching another mission overwrites it and they crash the script engine (gta_sa+0x6952A)
 static CRunningScript* FindMissionScript()
 {
+    const uint8_t* missionBlock = (const uint8_t*)CTheScripts::ScriptSpace + 200000;
     for (CRunningScript* s = CTheScripts::pActiveScripts; s; s = s->m_pNext)
     {
-        if (s->m_bIsMission && strncmp(s->m_szName, "coopand", 7) != 0)
+        if (strncmp(s->m_szName, "coopand", 7) == 0)
+            continue;
+        if (s->m_bIsMission || (s->m_pBaseIP >= missionBlock && s->m_pBaseIP < missionBlock + 69000))
             return s;
     }
     return nullptr;
