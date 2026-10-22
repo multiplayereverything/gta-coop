@@ -33,6 +33,7 @@
 #include "CAutoTest.h"
 #include "Commands/Commands/CCommandTeleportPlayersToHostSafely.h"
 #include "CMissionPartnerVehicles.h"
+#include "CCutscenePlayerHider.h"
 
 unsigned int lastOnFootSyncTickRate = 0;
 unsigned int lastDriverSyncTickRate = 0;
@@ -89,6 +90,8 @@ public:
 
             if (/*CNetwork::m_bConnected*/ CNetwork::m_bAuthenticated)
             {
+                CCutscenePlayerHider::Process();
+
                 // TODO: refactor
                 if (COpCodeSync::ms_bLoadingCutscene && !CLocalPlayer::m_bIsHost && CCutsceneMgr::ms_cutsceneName[0] &&
                     CCutsceneMgr::ms_cutsceneLoadStatus == 2)

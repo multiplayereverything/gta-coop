@@ -371,6 +371,16 @@ void CAutoTest::WriteStatus(bool inGame)
            << ",\"mission\":\"" << JsonEscape(GetMissionScriptName()) << "\""
            << ",\"cutscene\":\"" << (CCutsceneMgr::ms_running ? JsonEscape(std::string(CCutsceneMgr::ms_cutsceneName, 0, 8)) : "")
            << "\",\"skipVotes\":" << CCutsceneSkipVote::GetVotes() << ",\"skipVoters\":" << CCutsceneSkipVote::GetVoters();
+
+        // objective blips: shown, not short-range (shops/contact icons are short-range), no sprite (plain markers)
+        int blips = 0;
+        for (int i = 0; i < MAX_RADAR_TRACES; i++)
+        {
+            tRadarTrace& t = CRadar::ms_RadarTrace[i];
+            if (t.m_bInUse && t.m_nBlipDisplay != 0 && !t.m_bShortRange && t.m_nRadarSprite == 0)
+                blips++;
+        }
+        js << ",\"objectiveBlips\":" << blips;
     }
 
     CPlayerPed* player = inGame ? FindPlayerPed(0) : nullptr;
@@ -521,6 +531,12 @@ void CAutoTest::Execute(const std::string& line)
     else if (verb == "kill")
     {
         player->m_fHealth = 0.0f;
+    }
+    else if (verb == "nowanted")
+    {
+        // test runs start late missions on a fresh save: the locked cities give an instant 4-star wanted level
+        Command<Commands::SET_MAX_WANTED_LEVEL>(0);
+        Command<Commands::CLEAR_WANTED_LEVEL>(0);
     }
     else if (verb == "entermissioncar")
     {
