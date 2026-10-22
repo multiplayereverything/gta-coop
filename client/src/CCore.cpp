@@ -67,7 +67,9 @@ void CCore::Init()
 
     gvm.Detect();
 #ifdef _DEV
-    CCore::AllocateConsole();
+    // a hidden test game (-autohide) gets no console: showing it takes keyboard focus from the user
+    if (!CAutoTest::ms_bEnabled || !strstr(GetCommandLineA(), "-autohide"))
+        CCore::AllocateConsole();
 #endif
     CImGui::Init();
     CLaunchManager::CollectCommandLineArgs();

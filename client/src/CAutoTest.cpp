@@ -59,6 +59,67 @@ static std::string JsonEscape(const std::string& s)
     return out;
 }
 
+// -autohide: the game window can never be activated and sits behind every other window, so a test run never pops
+// up over (or takes keyboard focus from) whatever the user is doing; ProcessGame minimizes it once the game runs
+// (minimizing during startup leaves a 0x0 client area and the frontend never advances). Done by patching
+// gta_sa.exe's own imports of the user32 window calls, plus a CBT hook that vetoes activation from anywhere
+// (d3d9 and other modules activate the window through their own imports).
+static HWND ms_hHiddenWindow = NULL;
+static HHOOK ms_hActivationHook = NULL;
+
+static LRESULT CALLBACK ActivationHook_Hidden(int code, WPARAM wParam, LPARAM lParam)
+{
+    if (code == HCBT_ACTIVATE)  // any window of the game thread
+        return 1;
+    return CallNextHookEx(ms_hActivationHook, code, wParam, lParam);
+}
+
+static HWND WINAPI CreateWindowExA_Hidden(DWORD exStyle, LPCSTR cls, LPCSTR name, DWORD style, int x, int y, int w, int h,
+    HWND parent, HMENU menu, HINSTANCE inst, LPVOID param)
+{
+    if (!ms_hActivationHook)
+        ms_hActivationHook = SetWindowsHookExA(WH_CBT, ActivationHook_Hidden, NULL, GetCurrentThreadId());
+    HWND hWnd = CreateWindowExA(exStyle | WS_EX_NOACTIVATE, cls, name, style & ~WS_VISIBLE, x, y, w, h, parent, menu, inst, param);
+    char className[64] = "";
+    if (hWnd && !parent && GetClassNameA(hWnd, className, sizeof(className)) && !strcmp(className, "Grand theft auto San Andreas"))
+        ms_hHiddenWindow = hWnd;
+    return hWnd;
+}
+static BOOL WINAPI ShowWindow_Hidden(HWND hWnd, int nCmdShow)
+{
+    if (nCmdShow == SW_HIDE)
+        return ShowWindow(hWnd, SW_HIDE);
+    BOOL result = ShowWindow(hWnd, IsIconic(hWnd) ? SW_SHOWMINNOACTIVE : SW_SHOWNOACTIVATE);
+    SetWindowPos(hWnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    return result;
+}
+static BOOL WINAPI SetForegroundWindow_Hidden(HWND) { return TRUE; }
+static HWND WINAPI SetFocus_Hidden(HWND) { return GetFocus(); }
+static HWND WINAPI SetActiveWindow_Hidden(HWND) { return GetActiveWindow(); }
+static BOOL WINAPI BringWindowToTop_Hidden(HWND) { return TRUE; }
+
+static void PatchGameImport(const char* name, void* replacement)
+{
+    auto base = (uint8_t*)GetModuleHandleA(NULL);
+    auto nt = (IMAGE_NT_HEADERS*)(base + ((IMAGE_DOS_HEADER*)base)->e_lfanew);
+    auto& dir = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
+    void* target = (void*)GetProcAddress(GetModuleHandleA("user32.dll"), name);
+    if (!dir.VirtualAddress || !target)
+        return;
+    for (auto imp = (IMAGE_IMPORT_DESCRIPTOR*)(base + dir.VirtualAddress); imp->Name; imp++)
+    {
+        for (auto thunk = (IMAGE_THUNK_DATA*)(base + imp->FirstThunk); thunk->u1.Function; thunk++)
+        {
+            if ((void*)thunk->u1.Function != target)
+                continue;
+            DWORD old;
+            VirtualProtect(&thunk->u1.Function, sizeof(void*), PAGE_READWRITE, &old);
+            thunk->u1.Function = (uintptr_t)replacement;
+            VirtualProtect(&thunk->u1.Function, sizeof(void*), old, &old);
+        }
+    }
+}
+
 void CAutoTest::Init()
 {
     const char* cmd = GetCommandLineA();
@@ -66,6 +127,16 @@ void CAutoTest::Init()
         return;
 
     ms_bEnabled = true;
+
+    if (strstr(cmd, "-autohide"))
+    {
+        PatchGameImport("CreateWindowExA", CreateWindowExA_Hidden);
+        PatchGameImport("ShowWindow", ShowWindow_Hidden);
+        PatchGameImport("SetForegroundWindow", SetForegroundWindow_Hidden);
+        PatchGameImport("SetFocus", SetFocus_Hidden);
+        PatchGameImport("SetActiveWindow", SetActiveWindow_Hidden);
+        PatchGameImport("BringWindowToTop", BringWindowToTop_Hidden);
+    }
 
     if (const char* v = GetArg(cmd, "-autoip"))
         CopyArg(v, ms_ip, sizeof(ms_ip));
@@ -328,6 +399,17 @@ void CAutoTest::ProcessGame()
     }
 
     ms_nFrames++;
+
+    // -autohide: minimize once the game is in-game (CoopAndreas forces ForegroundApp, so it keeps running)
+    static bool minimized = false;
+    static uint32_t gameFrames = 0;
+    if (!minimized && ms_hHiddenWindow && ++gameFrames > 300)
+    {
+        minimized = true;
+        ShowWindow(ms_hHiddenWindow, SW_SHOWMINNOACTIVE);
+        Event("window_hidden");
+    }
+
     DetectChanges();
     DetectMission();
     ExecuteCommands();

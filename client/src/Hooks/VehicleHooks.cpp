@@ -4,6 +4,8 @@
 #include "CAimSync.h"
 #include "CNetworkVehicle.h"
 #include "CNetworkPed.h"
+#include "CAutoTest.h"
+#include <intrin.h>
 #include <CCarGenerator.h>
 #include <CPopCycle.h>
 #include <CServerTime.h>
@@ -221,6 +223,12 @@ bool __fastcall CCarGenerator__CheckForBlockage_Hook(CCarGenerator* This, SKIP_E
 // to create traffic vehicles without conflicts
 void CCarCtrl__GenerateOneRandomCar_Hook()
 {
+    // keep room for network vehicles: a full pool crashed partners on laggy links (see CNetworkVehicle::CreateVehicle)
+    if (CPools::ms_pVehiclePool->GetNoOfFreeSpaces() < 16)
+    {
+        return;
+    }
+
     int numCarsInRadius = 0;
     CVector pos = FindPlayerCoors(0);
     CPlayerPed* player = FindPlayerPed(0);
@@ -397,8 +405,28 @@ static void CCarCtrl__UpdateCarOnRails_Hook(CVehicle* pVehicle)
     CCarCtrl::UpdateCarOnRails(pVehicle);
 }
 
+// CVehicle::operator delete (0x6E2D90) frees the pool slot (ptr - m_pObjects) / sizeof(CHeli) and moves the next-free
+// index down to it. A pointer from outside the pool sets that index to a huge negative number, and the next vehicle
+// (network or traffic) is then constructed outside the pool - the partner crash over laggy links. Refuse those.
+static void __cdecl CVehicle__operator_delete_Hook(void* data)
+{
+    auto pool = CPools::ms_pVehiclePool;
+    int offset = (int)((uintptr_t)data - (uintptr_t)pool->m_pObjects);
+    int index = offset / (int)sizeof(CHeli);
+    if (data == nullptr || offset < 0 || offset % (int)sizeof(CHeli) != 0 || index >= pool->m_nSize || pool->IsFreeSlotAtIndex(index))
+    {
+        logger::warn("refused to delete vehicle %p (not a live pool slot), caller %p", data, _ReturnAddress());
+        CAutoTest::Event("vehicle_delete_refused", "\"ptr\":" + std::to_string((uintptr_t)data) +
+            ",\"caller\":" + std::to_string((uintptr_t)_ReturnAddress()));
+        return;
+    }
+    pool->Delete((CVehicle*)data);
+}
+
 void VehicleHooks::InjectHooks()
 {
+    patch::RedirectJump(0x6E2D90, CVehicle__operator_delete_Hook);
+
     patch::RedirectCall(0x53C1CB, CCarCtrl__RemoveDistantCars_Hook);
 
     patch::RedirectCall(0x46DCE4, CDamageManager__ApplyDamage_Hook);

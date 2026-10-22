@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "CNetworkVehicle.h"
+#include "CAutoTest.h"
 
 CNetworkVehicle::CNetworkVehicle(vehicleid_t vehicleid, int modelid, CVector pos, float rotation, unsigned char color1, unsigned char color2, unsigned char createdBy)
 {
@@ -25,6 +26,24 @@ CNetworkVehicle::CNetworkVehicle(vehicleid_t vehicleid, int modelid, CVector pos
 
 bool CNetworkVehicle::CreateVehicle(vehicleid_t vehicleid, int modelid, CVector pos, float rotation, unsigned char color1, unsigned char color2)
 {
+    // the pool's operator new returns null when full, and the constructor then writes through it (partner crash
+    // over a laggy link: VehicleSpawn -> CreateVehicle -> CAutomobile ctor). Skip the vehicle instead.
+    if (CPools::ms_pVehiclePool->GetNoOfFreeSpaces() == 0)
+    {
+        logger::warn("vehicle pool full, not creating network vehicle %s", to_string(vehicleid).c_str());
+        return false;
+    }
+
+    // the pool hands out &m_pObjects[++m_nFirstFree]; a bad next-free index makes the constructor write outside
+    // the pool (partner crash: this=0x0008D530 with 15/255 used). Repair the index before allocating.
+    auto pool = CPools::ms_pVehiclePool;
+    if (pool->m_nFirstFree < -1 || pool->m_nFirstFree >= pool->m_nSize)
+    {
+        logger::warn("vehicle pool next-free index corrupt (%d), resetting", pool->m_nFirstFree);
+        CAutoTest::Event("vehicle_pool_repaired", "\"firstFree\":" + std::to_string(pool->m_nFirstFree));
+        pool->m_nFirstFree = -1;
+    }
+
     unsigned char oldFlags = CStreaming::ms_aInfoForModel[modelid].m_nFlags;
     CStreaming::RequestModel(modelid, GAME_REQUIRED);
     CStreaming::LoadAllRequestedModels(false);
