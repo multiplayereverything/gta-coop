@@ -533,7 +533,11 @@ void CAutoTest::WriteStatus(bool inGame)
            << ",\"controlsDisabled\":" << (CPad::GetPad(0)->DisablePlayerControls ? "true" : "false")
            << ",\"widescreen\":" << (TheCamera.m_bWideScreenOn ? "true" : "false")
            << ",\"dtorEsiClobbered\":" << g_nVehicleDtorEsiClobbered
-           << ",\"radioCar\":\"" << RadioCar() << "\",\"area\":" << CGame::currArea;
+           << ",\"radioCar\":\"" << RadioCar() << "\",\"area\":" << CGame::currArea
+           << ",\"npcJitterCm\":"
+           << (CNetworkPedManager::ms_nJitterSamples ? CNetworkPedManager::ms_fJitterSum / CNetworkPedManager::ms_nJitterSamples : 0.0)
+           << ",\"npcJitterSamples\":" << CNetworkPedManager::ms_nJitterSamples << ",\"ownNpcJitterCm\":"
+           << (CNetworkPedManager::ms_nOwnJitterSamples ? CNetworkPedManager::ms_fOwnJitterSum / CNetworkPedManager::ms_nOwnJitterSamples : 0.0);
 
         // objective blips: shown, not short-range (shops/contact icons are short-range), no sprite (plain markers)
         // blips[]: type 1 car, 2 char, 3 object, 4 coord; live entity position, so playthrough scripts can follow
@@ -755,6 +759,18 @@ void CAutoTest::Execute(const std::string& line)
         in >> level;
         Command<Commands::SET_MAX_WANTED_LEVEL>(6);
         Command<Commands::ALTER_WANTED_LEVEL>(0, level);
+    }
+    else if (verb == "smoothing")
+    {
+        // smoothing <0|1>: on-foot smoothing of NPCs synced from other players (compare jitter); resets the metric
+        // smoothing <0|1> [strength]: also resets both jitter metrics
+        int on = 1;
+        float strength = CNetworkPedManager::ms_fSmoothingStrength;
+        in >> on >> strength;
+        CNetworkPedManager::ms_bSmoothing = on != 0;
+        CNetworkPedManager::ms_fSmoothingStrength = strength;
+        CNetworkPedManager::ms_fJitterSum = CNetworkPedManager::ms_fOwnJitterSum = 0.0;
+        CNetworkPedManager::ms_nJitterSamples = CNetworkPedManager::ms_nOwnJitterSamples = 0;
     }
     else if (verb == "enex")
     {

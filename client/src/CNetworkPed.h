@@ -22,6 +22,14 @@ public:
 	float m_fHealth = 100.0f;
 	bool m_bClaimOnRelease = false;
 
+	// on-foot smoothing (receiving side): last synced position, when it arrived; see CNetworkPedManager::Process
+	CVector m_vecSyncedPos{0.0f, 0.0f, 0.0f};
+	uint32_t m_nSyncedPosTime = 0;
+	// jitter metric (tests): position and movement in the previous frame
+	CVector m_vecLastFramePos{0.0f, 0.0f, 0.0f};
+	CVector m_vecLastFrameStep{0.0f, 0.0f, 0.0f};
+	bool m_bHasLastFrame = false;
+
 	static CNetworkPed* CreateHosted(CPed* ped);
 	void WarpIntoVehicleDriver(CVehicle* vehicle);
 	void WarpIntoVehiclePassenger(CVehicle* vehicle, int seatid);

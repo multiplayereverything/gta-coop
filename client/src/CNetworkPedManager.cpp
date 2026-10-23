@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "CNetworkVehicle.h"
 #include "CNetworkPed.h"
+#include "CAutoTest.h"
 
 std::vector<CNetworkPed*> CNetworkPedManager::m_pPeds;
 
@@ -191,12 +192,39 @@ void CNetworkPedManager::Update()
     }
 }
 
+// jitter metric for tests: how much a ped's frame-to-frame movement changes (smooth walking is low, snapping spikes)
+static void MeasureJitter(CNetworkPed* networkPed, double& sum, uint32_t& samples)
+{
+    CPed* ped = networkPed->m_pPed;
+    if (!CAutoTest::ms_bEnabled || !ped || !ped->m_matrix || ped->m_nPedFlags.bInVehicle)
+        return;
+    // counts reversals: a moving ped (>1 cm/frame both frames, horizontally) stepping backwards against its previous
+    // step - walking almost never does that, a snap back to a synced position always does. sum = reversals x 100
+    CVector step = ped->GetPosition() - networkPed->m_vecLastFramePos;
+    if (networkPed->m_bHasLastFrame && step.Magnitude() < 3.0f)
+    {
+        CVector2D now(step.x, step.y), before(networkPed->m_vecLastFrameStep.x, networkPed->m_vecLastFrameStep.y);
+        if (now.Magnitude() > 0.01f && before.Magnitude() > 0.01f)
+        {
+            if (now.x * before.x + now.y * before.y < 0.0f)
+                sum += 100.0;
+            samples++;
+        }
+    }
+    networkPed->m_vecLastFrameStep = networkPed->m_bHasLastFrame ? step : CVector(0.0f, 0.0f, 0.0f);
+    networkPed->m_vecLastFramePos = ped->GetPosition();
+    networkPed->m_bHasLastFrame = true;
+}
+
 void CNetworkPedManager::Process()
 {
     for (auto networkPed : m_pPeds)
     {
         if (networkPed->m_bSyncing)
+        {
+            MeasureJitter(networkPed, ms_fOwnJitterSum, ms_nOwnJitterSamples);  // baseline: peds this game runs
             continue;
+        }
 
         CPed* ped = networkPed->m_pPed;
 
@@ -208,6 +236,28 @@ void CNetworkPedManager::Process()
             ped->m_fAimingRotation = networkPed->m_fAimingRotation;
             ped->m_fCurrentRotation = networkPed->m_fCurrentRotation;
             ped->m_fLookDirection = networkPed->m_fLookDirection;
+
+            // glide towards where the owner's ped is now: last synced position moved on by its velocity (velocity is
+            // per 1/50 s; predict at most 200 ms), closing ~25% of the gap per 50 fps frame instead of snapping
+            if (ms_bSmoothing && networkPed->m_nSyncedPosTime != 0 && ped->m_matrix)
+            {
+                uint32_t age = CTimer::m_snTimeInMilliseconds - networkPed->m_nSyncedPosTime;
+                float ahead = (std::min)(age, 200u) / 20.0f;
+                CVector predicted = networkPed->m_vecSyncedPos + networkPed->m_vecVelocity * ahead;
+                CVector error = predicted - ped->GetPosition();
+                // height is left to the local ground collision/gravity (pulling it fought them: vertical jitter),
+                // unless it is clearly off (stairs, slopes the other game resolved differently)
+                if (fabs(error.z) < 1.0f)
+                    error.z = 0.0f;
+                if (error.Magnitude() > 0.05f)
+                {
+                    float k = (std::min)(ms_fSmoothingStrength * CTimer::ms_fTimeStep, 1.0f);
+                    ped->SetPosn(ped->GetPosition() + error * k);
+                }
+                ped->m_vecMoveSpeed = networkPed->m_vecVelocity;
+            }
+
+            MeasureJitter(networkPed, ms_fJitterSum, ms_nJitterSamples);
         }
     }
 }

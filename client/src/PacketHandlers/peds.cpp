@@ -93,7 +93,16 @@ PACKET_HANDLER(ePacketType::PED_ONFOOT, Packets::Peds::PedOnFoot* pPedOnFoot)
     }
 
     pNetworkPed->ApplyWeaponSnapshot(pPedOnFoot->weaponSnapshot);
-    pPed->SetPosn(pPedOnFoot->pos);
+    // snapping to every update (20/s) made NPCs jitter: only snap when far off (teleports, first update), otherwise
+    // CNetworkPedManager::Process glides the ped towards the synced position every frame
+    if (!CNetworkPedManager::ms_bSmoothing || pNetworkPed->m_nSyncedPosTime == 0 ||
+        (pPed->GetPosition() - pPedOnFoot->pos).Magnitude() > 6.0f)
+    {
+        pPed->SetPosn(pPedOnFoot->pos);
+    }
+    pNetworkPed->m_vecSyncedPos = pPedOnFoot->pos;
+    pNetworkPed->m_nSyncedPosTime = CTimer::m_snTimeInMilliseconds;
+    pPed->m_vecMoveSpeed = pPedOnFoot->velocity;
 
     pNetworkPed->m_fCurrentRotation = pPed->m_fCurrentRotation = pPedOnFoot->currentRotation.m_angle;
     pNetworkPed->m_fAimingRotation = pPed->m_fAimingRotation = pPedOnFoot->aimingRotation.m_angle;
