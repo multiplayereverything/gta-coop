@@ -483,10 +483,33 @@ static void InjectVehicleDtorShims()
     logger::info("vehicle deleting destructors shimmed: %d", ms_nDtorSites);
 }
 
+// The vehicle audio service turns the (single, global) radio on/off when a *player* drives or rides a vehicle.
+// Remote players are player peds too, so a friend getting into any car started the radio for everyone.
+// Only the local player's vehicle may switch the radio. this+4 = the audio entity's vehicle.
+static void __fastcall CAEVehicleAudioEntity__TurnOnRadioForVehicle_Hook(void* This)
+{
+    CVehicle* vehicle = *(CVehicle**)((uint8_t*)This + 4);
+    if (vehicle && vehicle == FindPlayerVehicle(0, false))
+        plugin::CallMethod<0x4F5B20>(This);
+}
+
+static void __fastcall CAEVehicleAudioEntity__TurnOffRadioForVehicle_Hook(void* This)
+{
+    CVehicle* vehicle = *(CVehicle**)((uint8_t*)This + 4);
+    CVehicle* mine = FindPlayerVehicle(0, false);
+    if (!mine || mine == vehicle)  // leaving my own car (no vehicle any more) or my car itself
+        plugin::CallMethod<0x4F5B60>(This);
+}
+
 void VehicleHooks::InjectHooks()
 {
     patch::RedirectJump(0x6E2D90, CVehicle__operator_delete_Hook);
     InjectVehicleDtorShims();
+    patch::RedirectCall(0x50237C, CAEVehicleAudioEntity__TurnOnRadioForVehicle_Hook);
+    // also the audio update that uses FindPlayerVehicle(-1): CWorld::PlayerInFocus is a remote player while their
+    // sync is processed, so their car's radio was switched on
+    patch::RedirectCall(0x45F159, CAEVehicleAudioEntity__TurnOnRadioForVehicle_Hook);
+    patch::RedirectCall(0x5023A3, CAEVehicleAudioEntity__TurnOffRadioForVehicle_Hook);
 
     patch::RedirectCall(0x53C1CB, CCarCtrl__RemoveDistantCars_Hook);
 

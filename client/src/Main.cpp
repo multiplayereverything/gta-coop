@@ -34,6 +34,7 @@
 #include "Commands/Commands/CCommandTeleportPlayersToHostSafely.h"
 #include "CMissionPartnerVehicles.h"
 #include "CCutscenePlayerHider.h"
+#include "CAreaConsistency.h"
 
 unsigned int lastOnFootSyncTickRate = 0;
 unsigned int lastDriverSyncTickRate = 0;
@@ -91,6 +92,7 @@ public:
             if (/*CNetwork::m_bConnected*/ CNetwork::m_bAuthenticated)
             {
                 CCutscenePlayerHider::Process();
+                CAreaConsistency::Process();
 
                 // TODO: refactor
                 if (COpCodeSync::ms_bLoadingCutscene && !CLocalPlayer::m_bIsHost && CCutsceneMgr::ms_cutsceneName[0] &&
@@ -121,8 +123,13 @@ public:
 
                     if (lastOnMissionFlag)
                     {
-                        // partners far away when the mission starts are brought to the host
-                        CCommandTeleportPlayersToHostSafely::RequestFarPartnersTeleport();
+                        // partners far away when the mission starts are brought to the host - only for a real
+                        // mission script: the save menu sets the on-mission flag too
+                        bool missionScript = false;
+                        for (CRunningScript* s = CTheScripts::pActiveScripts; s; s = s->m_pNext)
+                            missionScript |= s->m_bIsMission && strncmp(s->m_szName, "coopand", 7) != 0;
+                        if (missionScript)
+                            CCommandTeleportPlayersToHostSafely::RequestFarPartnersTeleport();
                     }
 
                     Packets::Scripts::OnMissionFlagSync packet{};

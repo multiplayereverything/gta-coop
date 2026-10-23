@@ -14,6 +14,14 @@ WNDPROC prevWndProc;
 
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+    // the game keeps running unfocused (ForegroundApp forced, see CPatch), so it no longer pauses and resets the
+    // keyboard on alt-tab: keys held at that moment (Alt = walk, movement keys) never got their key-up and stayed
+    // "pressed" - after alt-tabbing during a cutscene the player could not move. Release everything on focus changes.
+    if (message == WM_ACTIVATEAPP || message == WM_KILLFOCUS || message == WM_SETFOCUS)
+    {
+        memset((void*)0xB72CB0, 0, 0x270 * 3);  // CPad::TempKeyState, OldKeyState, NewKeyState (CKeyboardState each)
+        CPad::GetPad(0)->PCTempKeyState = CControllerState();
+    }
     CChat::WndProc(hWnd, message, wParam, lParam);
     CCustomMenuManager::WndProc(hWnd, message, wParam, lParam);
     if (CImGui::WndProc(hWnd, message, wParam, lParam))

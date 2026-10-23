@@ -235,6 +235,21 @@ add_float_var_to_float_var $walk2_offY_barbers += $barber_shop_offsetY
 $walk2_offZ_barbers = 1000.836
 add_float_var_to_float_var $walk2_offZ_barbers += $barber_shop_offsetZ
 
+// partners first wait for a shopkeeper another player's shop script already created: every player runs this
+// script, and players walking in together each created one (3 barbers for 3 players)
+if
+    not Coop.IsHost()
+then
+    for $coop_shop_wait = 1 to 20
+        $shop_keep_barbers = Coop.GetPedInAreaWithModel($barberX, $barberY, $barberZ, 4.0, 4.0, 40.0, 156, 177, 176) // barber models
+        if
+            $shop_keep_barbers <> -1
+        then
+            Break
+        end
+        wait 100
+    end
+end
 $shop_keep_barbers = Coop.GetPedInAreaWithModel($barberX, $barberY, $barberZ, 4.0, 4.0, 40.0, 156, 177, 176) // barber models
 
 if $shop_keep_barbers == -1

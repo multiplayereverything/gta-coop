@@ -186,6 +186,21 @@ if
   $jfud_keep_created == 0
 goto_if_false @JFUD_1420
 
+// partners first wait for a shopkeeper another player's shop script already created: every player runs this
+// script, and players walking in together each created one (3 barbers for 3 players)
+if
+    not Coop.IsHost()
+then
+    for $coop_shop_wait = 1 to 20
+        $shop_keep_junkfud = Coop.GetPedInAreaWithModel($junkfudX, $junkfudY, $junkfudZ, 1.5, 1.5, 40.0, $shopkeeper_model_shops, -1, -1)
+        if
+            $shop_keep_junkfud <> -1
+        then
+            Break
+        end
+        wait 100
+    end
+end
 $shop_keep_junkfud = Coop.GetPedInAreaWithModel($junkfudX, $junkfudY, $junkfudZ, 1.5, 1.5, 40.0, $shopkeeper_model_shops, -1, -1)
 if $shop_keep_junkfud == -1
 then

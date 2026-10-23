@@ -490,6 +490,17 @@ void CAutoTest::OnChatMessage(const char* name, const wchar_t* message)
         ms_chatLog.pop_front();
 }
 
+// which car the (single) radio is tuned to: 0xB6B99C = that car's audio entity settings (entity + 0x80), set by
+// CAEVehicleAudioEntity::TurnOnRadioForVehicle and cleared by TurnOffRadioForVehicle
+static const char* RadioCar()
+{
+    uint8_t* settings = *(uint8_t**)0xB6B99C;
+    if (!settings)
+        return "none";
+    CVehicle* vehicle = *(CVehicle**)(settings - 0x80 + 4);
+    return vehicle && vehicle == FindPlayerVehicle(0, false) ? "mine" : "other";
+}
+
 void CAutoTest::WriteStatus(bool inGame)
 {
     uint32_t now = GetTickCount();
@@ -521,7 +532,8 @@ void CAutoTest::WriteStatus(bool inGame)
            << "\",\"skipVotes\":" << CCutsceneSkipVote::GetVotes() << ",\"skipVoters\":" << CCutsceneSkipVote::GetVoters()
            << ",\"controlsDisabled\":" << (CPad::GetPad(0)->DisablePlayerControls ? "true" : "false")
            << ",\"widescreen\":" << (TheCamera.m_bWideScreenOn ? "true" : "false")
-           << ",\"dtorEsiClobbered\":" << g_nVehicleDtorEsiClobbered;
+           << ",\"dtorEsiClobbered\":" << g_nVehicleDtorEsiClobbered
+           << ",\"radioCar\":\"" << RadioCar() << "\",\"area\":" << CGame::currArea;
 
         // objective blips: shown, not short-range (shops/contact icons are short-range), no sprite (plain markers)
         // blips[]: type 1 car, 2 char, 3 object, 4 coord; live entity position, so playthrough scripts can follow
@@ -735,6 +747,41 @@ void CAutoTest::Execute(const std::string& line)
     else if (verb == "kill")
     {
         player->m_fHealth = 0.0f;
+    }
+    else if (verb == "wanted")
+    {
+        // wanted <level>: the local player's own wanted level (checks that it doesn't spread to the others)
+        int level = 0;
+        in >> level;
+        Command<Commands::SET_MAX_WANTED_LEVEL>(6);
+        Command<Commands::ALTER_WANTED_LEVEL>(0, level);
+    }
+    else if (verb == "enex")
+    {
+        // enex <name> <0|1>: open/close an entry/exit (doors the story unlocks later, e.g. CARLS, BARBERS)
+        std::string name;
+        int on = 1;
+        in >> name >> on;
+        Command<Commands::SWITCH_ENTRY_EXIT>(name.c_str(), on != 0);
+    }
+    else if (verb == "countpeds")
+    {
+        // countpeds <radius> <model> [model...]: non-player peds of those models around the player (duplicates)
+        float radius = 10.0f;
+        in >> radius;
+        std::vector<int> models;
+        for (int m; in >> m;)
+            models.push_back(m);
+        int count = 0;
+        for (int i = 0; i < CPools::ms_pPedPool->m_nSize; i++)
+        {
+            CPed* ped = CPools::ms_pPedPool->GetAt(i);
+            if (!ped || ped->IsPlayer() || (ped->GetPosition() - player->GetPosition()).Magnitude() > radius)
+                continue;
+            if (std::find(models.begin(), models.end(), (int)ped->m_nModelIndex) != models.end())
+                count++;
+        }
+        result = "count=" + std::to_string(count);
     }
     else if (verb == "nowanted")
     {

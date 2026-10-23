@@ -118,6 +118,21 @@ Sequence.Close(8@)
 9@ = Attractor.Add(3@, 4@, 5@, 6@, 7@, 8@)
 
 // 3@, 4@, 5@ - xyz, 10@ - ped, 11@ - model
+// partners first wait for a shopkeeper another player's shop script already created: every player runs this
+// script, and players walking in together each created one (3 barbers for 3 players)
+if
+    not Coop.IsHost()
+then
+    for $coop_shop_wait = 1 to 20
+        10@ = Coop.GetPedInAreaWithModel(3@, 4@, 5@, 1.5, 1.5, 40.0, 11@, -1, -1)
+        if
+            10@ <> -1
+        then
+            Break
+        end
+        wait 100
+    end
+end
 10@ = Coop.GetPedInAreaWithModel(3@, 4@, 5@, 1.5, 1.5, 40.0, 11@, -1, -1)
 
 if 10@ == -1

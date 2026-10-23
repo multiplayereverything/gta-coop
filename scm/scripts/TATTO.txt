@@ -169,6 +169,21 @@ Text.UseCommands(True)
 Stat.ShowUpdateStats(False)
 
 
+// partners first wait for a shopkeeper another player's shop script already created: every player runs this
+// script, and players walking in together each created one (3 barbers for 3 players)
+if
+    not Coop.IsHost()
+then
+    for $coop_shop_wait = 1 to 20
+        $shop_keep_tattoo = Coop.GetPedInAreaWithModel($shop_keep_tattooX, $shop_keep_tattooY, $shop_keep_tattooZ, 4.0, 4.0, 40.0, 180, -1, -1)
+        if
+            $shop_keep_tattoo <> -1
+        then
+            Break
+        end
+        wait 100
+    end
+end
 $shop_keep_tattoo = Coop.GetPedInAreaWithModel($shop_keep_tattooX, $shop_keep_tattooY, $shop_keep_tattooZ, 4.0, 4.0, 40.0, 180, -1, -1)
 
 if $shop_keep_tattoo == -1

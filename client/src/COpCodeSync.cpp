@@ -199,10 +199,6 @@ const SSyncedOpCode syncedOpcodes[] = {
     // Controls
     {0x01B4, true, {eSyncedParamType::PLAYER}},  // set_player_control[Player] {state}[bool]
     {COMMAND_ADD_SCORE, true, {eSyncedParamType::PLAYER}},
-    // wanted level, unported missions only (shared with every player, see IsSharedPlayerOpcode)
-    {COMMAND_ALTER_WANTED_LEVEL, true, {eSyncedParamType::PLAYER}},
-    {COMMAND_ALTER_WANTED_LEVEL_NO_DROP, true, {eSyncedParamType::PLAYER}},
-    {COMMAND_CLEAR_WANTED_LEVEL, true, {eSyncedParamType::PLAYER}},
 
     {COMMAND_REQUEST_MODEL}};
 
@@ -278,21 +274,17 @@ static bool IsUnportedMissionFallbackOpcode(int opcode)
         case 0x02E4:  // load_cutscene
         case 0x02E7:  // start_cutscene
         case 0x02EA:  // clear_cutscene
-        case COMMAND_ADD_SCORE:
-        case COMMAND_ALTER_WANTED_LEVEL:
-        case COMMAND_ALTER_WANTED_LEVEL_NO_DROP:
-        case COMMAND_CLEAR_WANTED_LEVEL:
+        case COMMAND_ADD_SCORE:  // money rewards are shared; the wanted level stays per player (players asked)
             return true;
     }
     return false;
 }
 
-// money and wanted level of an unported mission go to *every* player: the host's own player parameter ($player1)
+// money rewards of an unported mission go to *every* player: the host's own player parameter ($player1)
 // is sent as plain 0, which each client reads as its own local player
 static bool IsSharedPlayerOpcode(int opcode)
 {
-    return opcode == COMMAND_ADD_SCORE || opcode == COMMAND_ALTER_WANTED_LEVEL ||
-           opcode == COMMAND_ALTER_WANTED_LEVEL_NO_DROP || opcode == COMMAND_CLEAR_WANTED_LEVEL;
+    return opcode == COMMAND_ADD_SCORE;
 }
 
 static bool IsUnportedMissionScript(CRunningScript* script)

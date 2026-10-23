@@ -82,6 +82,10 @@ void CCommandTeleportPlayersToHostSafely::ProcessPendingTeleport()
 	CPlayerPed* host = FindPlayerPed(0);
 	if (!host || host->m_nPedFlags.bInVehicle || CCutsceneMgr::ms_running)
 		return;
+	// the host inside an interior (save point in CJ's house, shops): its coordinates are ~1000 m up in its own area;
+	// partners teleported there stay in the outside world and end up in the sky
+	if (host->m_nAreaCode != 0 || host->GetPosition().z > 500.0f)
+		return;
 
 	int playerCount = 0;
 	CNetworkPlayer* networkPlayers[MAX_TELEPORT_SLOTS];
