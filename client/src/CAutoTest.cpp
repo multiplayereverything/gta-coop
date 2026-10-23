@@ -4,6 +4,7 @@
 #include "CRadarSync.h"
 #include "CCutsceneSkipVote.h"
 #include "COpCodeSync.h"
+#include "CCoopPerf.h"
 #include <CMessages.h>
 #include <C3dMarkers.h>
 #include <CEntryExitManager.h>
@@ -318,6 +319,12 @@ void CAutoTest::DetectChanges()
         isHost = CLocalPlayer::m_bIsHost;
         Event(isHost ? "host_gained" : "host_lost");
     }
+    static bool menu = false;
+    if (FrontEndMenuManager.m_bMenuActive != menu)
+    {
+        menu = FrontEndMenuManager.m_bMenuActive;
+        Event(menu ? "menu_opened" : "menu_closed", "\"page\":" + std::to_string(FrontEndMenuManager.m_nCurrentMenuPage));
+    }
 
     std::unordered_map<uint32_t, bool> now;
     for (CNetworkPlayer* np : CNetworkPlayerManager::m_pPlayers)
@@ -531,6 +538,16 @@ void CAutoTest::WriteStatus(bool inGame)
            << ",\"cutscene\":\"" << (CCutsceneMgr::ms_running ? JsonEscape(std::string(CCutsceneMgr::ms_cutsceneName, 0, 8)) : "")
            << "\",\"skipVotes\":" << CCutsceneSkipVote::GetVotes() << ",\"skipVoters\":" << CCutsceneSkipVote::GetVoters()
            << ",\"controlsDisabled\":" << (CPad::GetPad(0)->DisablePlayerControls ? "true" : "false")
+           << ",\"pad\":{\"dpc\":" << CPad::GetPad(0)->DisablePlayerControls << ",\"mode\":" << CPad::GetPad(0)->Mode
+           << ",\"brakes\":" << (int)CPad::GetPad(0)->bApplyBrakes << ",\"stickY\":" << CPad::GetPad(0)->NewState.LeftStickY
+           << ",\"tempStickY\":" << CPad::GetPad(0)->PCTempKeyState.LeftStickY << ",\"keyW\":" << CPad::NewKeyState.standardKeys['W']
+           << ",\"lalt\":" << CPad::NewKeyState.lmenu << ",\"menu\":" << (int)FrontEndMenuManager.m_bMenuActive
+           << ",\"userPause\":" << (int)CTimer::m_UserPause << ",\"codePause\":" << (int)CTimer::m_CodePause
+           << ",\"pedState\":" << (FindPlayerPed(0) ? (int)FindPlayerPed(0)->m_ePedState : -1)
+           << ",\"task\":" << (FindPlayerPed(0) && FindPlayerPed(0)->m_pIntelligence->m_TaskMgr.GetActiveTask() ? (int)FindPlayerPed(0)->m_pIntelligence->m_TaskMgr.GetActiveTask()->GetTaskType() : -1)
+           << ",\"focus\":" << (int)CWorld::PlayerInFocus << "}"
+           << ",\"minigame\":" << (CTheScripts::bMiniGameInProgress ? "true" : "false")
+           << ",\"coopUs\":{\"net\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::NET] << ",\"process\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PROCESS] << ",\"draw\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::DRAW] << ",\"autotest\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::AUTOTEST] << ",\"peds\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PEDS] << ",\"vehicles\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::VEHICLES] << ",\"tags\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::TAGS] << ",\"chatAndRest\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::CHAT] << ",\"playerList\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PLAYERLIST] << ",\"checkpoint\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::CHECKPOINT] << ",\"input\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::INPUT] << ",\"version\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::VERSION] << "}"
            << ",\"widescreen\":" << (TheCamera.m_bWideScreenOn ? "true" : "false")
            << ",\"dtorEsiClobbered\":" << g_nVehicleDtorEsiClobbered
            << ",\"radioCar\":\"" << RadioCar() << "\",\"area\":" << CGame::currArea
@@ -728,6 +745,9 @@ void CAutoTest::Execute(const std::string& line)
         if (vehicle)
         {
             vehicle->m_nVehicleFlags.bHasBeenOwnedByPlayer = true;
+            std::string kind;
+            if (in >> kind && kind == "mission")  // vehicle <model> mission: like a car a mission script created
+                vehicle->m_nCreatedBy = eVehicleCreatedBy::MISSION_VEHICLE;
             Command<Commands::WARP_CHAR_INTO_CAR>(CPools::GetPedRef(player), CPools::GetVehicleRef(vehicle));
         }
         else

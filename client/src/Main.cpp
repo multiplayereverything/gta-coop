@@ -35,6 +35,8 @@
 #include "CMissionPartnerVehicles.h"
 #include "CCutscenePlayerHider.h"
 #include "CAreaConsistency.h"
+#include "CCustomMenuManager.h"
+#include "CCoopPerf.h"
 
 unsigned int lastOnFootSyncTickRate = 0;
 unsigned int lastDriverSyncTickRate = 0;
@@ -59,6 +61,7 @@ public:
 			};
         Events::gameProcessEvent.before += []
         {
+            CCoopPerf::Scope perf(CCoopPerf::NET);
             if (CNetwork::m_bConnected)
             {
                 bBeenConnected = true;
@@ -83,11 +86,13 @@ public:
         };
         Events::gameProcessEvent += []
         {
+            CCoopPerf::Scope perf(CCoopPerf::PROCESS);
             CNetworkAnimQueue::Process();
             CEntryExitTransitionSync::Process();
             CDiscordRPCMgr::Update();
             CDebugVehicleSpawner::Process();
-            CAutoTest::ProcessGame();
+            { CCoopPerf::Scope p(CCoopPerf::AUTOTEST); CAutoTest::ProcessGame(); }
+            CCustomMenuManager::CloseFocusPauseMenu();
 
             if (/*CNetwork::m_bConnected*/ CNetwork::m_bAuthenticated)
             {
@@ -208,7 +213,7 @@ public:
 
                 if (tickCount > lastIdleVehicleSyncTickRate + 150)
                 {
-                    CNetworkVehicleManager::UpdateIdle();
+                    { CCoopPerf::Scope p(CCoopPerf::VEHICLES); CNetworkVehicleManager::UpdateIdle(); }
                     lastIdleVehicleSyncTickRate = tickCount;
                 }
                 
@@ -233,7 +238,7 @@ public:
 
                 CAimSync::ProcessSyncing();
 
-                CNetworkPedManager::Process();
+                { CCoopPerf::Scope p(CCoopPerf::PEDS); CNetworkPedManager::Process(); }
 
                 static uint32_t crashHotkeyPressedAt = 0;
 
@@ -261,6 +266,8 @@ public:
         };
         Events::drawingEvent += []
         {
+            CCoopPerf::EndFrame();
+            CCoopPerf::Scope perf(CCoopPerf::DRAW);
             if (CEntryExitMarkerSync::ms_bUpdateAfterProcessingThisFrame && CLocalPlayer::m_bIsHost &&
                 CEntryExitMarkerSync::ms_nLastUpdate + 5000 < GetTickCount())
             {
@@ -274,21 +281,28 @@ public:
                 CEntryExitMarkerSync::Send();
             }*/
 
-            CNetworkCheckpoint::Process();
-            CNetworkPlayerNameTag::Process();
-            CChat::Draw();
-            CChat::DrawInput();
+            { CCoopPerf::Scope p(CCoopPerf::CHECKPOINT); CNetworkCheckpoint::Process(); }
+            { CCoopPerf::Scope p(CCoopPerf::TAGS); CNetworkPlayerNameTag::Process(); }
+            {
+                CCoopPerf::Scope pChat(CCoopPerf::CHAT);
+                CDXFont::Batch textBatch;  // chat lines: 5 DrawText per segment (shadow + text) in one sprite batch
+                CChat::Draw();
+            }
+            { CCoopPerf::Scope p(CCoopPerf::INPUT); CChat::DrawInput(); }
 
             if (FrontEndMenuManager.m_bPrefsShowHud)
             {
-                CNetworkPlayerList::Draw();
+                { CCoopPerf::Scope p(CCoopPerf::PLAYERLIST); CNetworkPlayerList::Draw(); }
             }
 
-            if (FrontEndMenuManager.m_bPrefsShowHud && CCore::Version.stage != SEMVER_STAGE_RELEASE)
+            if (FrontEndMenuManager.m_bPrefsShowHud && CCore::Version.stage != SEMVER_STAGE_RELEASE && CChat::m_bInputActive)
             {
-                CDXFont::Draw(0, RsGlobal.maximumHeight - CDXFont::m_fFontSize,
-                    std::string("CoopAndreas " + std::string(COOPANDREAS_VERSION)).c_str(),
-                    D3DCOLOR_ARGB(255, 160, 160, 160));
+                // only while typing in chat: drawing it every frame cost ~0.07 ms (D3DX lays text out on every call)
+                static std::vector<CTextSegment> versionText = CDXFont::ParseColorSegments(
+                    CUnicode::ConvertUtf8ToUtf16("CoopAndreas " + std::string(COOPANDREAS_VERSION)), D3DCOLOR_ARGB(255, 160, 160, 160));
+                CDXFont::Batch textBatch;
+                CCoopPerf::Scope pv(CCoopPerf::VERSION);
+                CDXFont::DrawSegmentWithShadow(0, RsGlobal.maximumHeight - CDXFont::m_fFontSize, versionText[0].text.c_str(), versionText[0].color);
             }
 
             if (/*CNetwork::m_bConnected && */ GetAsyncKeyState(VK_F10))

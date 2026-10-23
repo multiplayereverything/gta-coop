@@ -27,6 +27,7 @@
 #include "Commands/CCommandIsPointOnAnyPlayersScreen.h"
 #include "Commands/CCommandSetBlipVisibleTo.h"
 #include "Commands/CCommandSetAutotestPassLabel.h"
+#include "Commands/CCommandIsAnyNetworkPlayerInArea3D.h"
 
 class CCustomCommandRegistrar
 {
@@ -59,5 +60,6 @@ public:
 		CCustomCommandMgr::RegisterCommand(0x1D1E, new CCommandIsPointOnAnyPlayersScreen());
 		CCustomCommandMgr::RegisterCommand(0x1D1F, new CCommandSetBlipVisibleTo());
 		CCustomCommandMgr::RegisterCommand(0x1D20, new CCommandSetAutotestPassLabel());
+		CCustomCommandMgr::RegisterCommand(0x1D21, new CCommandIsAnyNetworkPlayerInArea3D());
 	}
 };

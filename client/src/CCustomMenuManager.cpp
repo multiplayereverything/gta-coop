@@ -260,6 +260,25 @@ void DrawCustomScreen_NicknamePortIp(CMenuManager* This)
 	//}
 }
 
+DWORD g_nLastFocusChangeTime = 0;
+
+void CCustomMenuManager::CloseFocusPauseMenu()
+{
+	// the Widescreen Fix plugin (AllowAltTabbingWithoutPausing = 0) opens the pause menu when the window gets focus
+	// back; in coop that paused the game (often with the menu not even drawn), and after alt-tabbing during a cutscene
+	// the player could not move. Close a pause menu that opened right after a focus change (Esc still opens it).
+	static bool wasActive = false;
+	CMenuManager* menu = &FrontEndMenuManager;
+	if (menu->m_bMenuActive && !wasActive && !menu->m_bGameNotLoaded && CNetwork::m_bConnected
+		&& GetTickCount() - g_nLastFocusChangeTime < 1500 && !menu->m_bShutDownFrontEndRequested)
+	{
+		menu->RequestFrontEndShutDown();
+		if (CAutoTest::ms_bEnabled)
+			CAutoTest::Event("focus_pause_closed");
+	}
+	wasActive = menu->m_bMenuActive;
+}
+
 void __fastcall CMenuManager__DrawStandardMenu_Hook(CMenuManager* This, SKIP_EDX, char a1)
 {
 	CCompatibilityChecker::Process();

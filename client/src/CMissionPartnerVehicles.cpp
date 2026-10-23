@@ -91,6 +91,26 @@ static void SpawnFor(CVehicle* vehicle, int count)
     CAutoTest::Event("partner_vehicles", "\"model\":" + std::to_string(model) + ",\"count\":" + std::to_string(count));
 }
 
+// the blue marker only shows partners where the spare car is; once someone sits in it, it's just in the way
+static void UpdateBlips()
+{
+    for (SExtraVehicle& extra : ms_extraVehicles)
+    {
+        CVehicle* vehicle = CPools::GetVehicle(extra.handle);
+        bool occupied = vehicle && (vehicle->m_pDriver || vehicle->m_nNumPassengers > 0);
+        if ((occupied || !vehicle) && extra.blip != -1)
+        {
+            Command<Commands::REMOVE_BLIP>(extra.blip);
+            extra.blip = -1;
+        }
+        else if (vehicle && !occupied && extra.blip == -1)
+        {
+            Command<Commands::ADD_BLIP_FOR_CAR>(extra.handle, &extra.blip);
+            Command<Commands::SET_BLIP_AS_FRIENDLY>(extra.blip, 1);
+        }
+    }
+}
+
 void CMissionPartnerVehicles::Process()
 {
     if (!CLocalPlayer::m_bIsHost)
@@ -108,6 +128,7 @@ void CMissionPartnerVehicles::Process()
     if (now - ms_nLastCheck < 1000)
         return;
     ms_nLastCheck = now;
+    UpdateBlips();
 
     CPlayerPed* host = FindPlayerPed(0);
     if (!host || !host->m_nPedFlags.bInVehicle || CCutsceneMgr::ms_running)

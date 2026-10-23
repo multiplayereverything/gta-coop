@@ -64757,6 +64757,26 @@
                         "is_static": true
                     },
                     "short_desc": "Autotest only: registers the mission's pass routine, the autotest passmission command jumps there"
+                },
+                {
+                    "input": [
+                        { "name": "x", "type": "float" },
+                        { "name": "y", "type": "float" },
+                        { "name": "z", "type": "float" },
+                        { "name": "radiusX", "type": "float" },
+                        { "name": "radiusY", "type": "float" },
+                        { "name": "radiusZ", "type": "float" }
+                    ],
+                    "id": "1D21",
+                    "name": "COOP_IS_ANY_NETWORK_PLAYER_IN_AREA_3D",
+                    "num_params": 6,
+                    "class": "Coop",
+                    "member": "IsAnyNetworkPlayerInArea3D",
+                    "attrs": {
+                        "is_static": true,
+                        "is_condition": true
+                    },
+                    "short_desc": "True if another (network) player stands in the box, e.g. sits in a shop chair"
                 }
             ]
         }

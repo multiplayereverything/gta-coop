@@ -322,7 +322,7 @@ void CChat::Draw()
             D3DCOLOR blendedColor = r << 16 | g << 8 | b & 0xFF | blendedAlpha << 24;
 
             CDXFont::DrawSegmentWithShadow(x, y, seg.text.c_str(), blendedColor);
-            x += CDXFont::GetTextWidth(seg.text);
+            x += CDXFont::GetTextWidth(seg);
         }
 
         drawnMessages++;

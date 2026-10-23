@@ -11,6 +11,7 @@
 semver_t CCore::Version;
 
 WNDPROC prevWndProc;
+extern DWORD g_nLastFocusChangeTime;
 
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -21,6 +22,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
     {
         memset((void*)0xB72CB0, 0, 0x270 * 3);  // CPad::TempKeyState, OldKeyState, NewKeyState (CKeyboardState each)
         CPad::GetPad(0)->PCTempKeyState = CControllerState();
+        g_nLastFocusChangeTime = GetTickCount();  // see CCustomMenuManager::CloseFocusPauseMenu: no pause menu on alt-tab
     }
     CChat::WndProc(hWnd, message, wParam, lParam);
     CCustomMenuManager::WndProc(hWnd, message, wParam, lParam);

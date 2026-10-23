@@ -319,7 +319,11 @@ $barber_look_shops = 1
 
 :BARB_2250
 $blob_flag_shop = 1
-if 
+// one chair: wait while another player is in it (every player runs this shop script)
+if
+  not Coop.IsAnyNetworkPlayerInArea3D($keep_offX, $keep_offY, $keep_offZ, 1.5, 1.5, 3.0)
+goto_if_false @BARB_2335
+if
   Char.LocateStoppedOnFoot3D($scplayer, $keep_offX, $keep_offY, $keep_offZ, 1.0, 1.0, 4.0, $blob_flag_shop)
 goto_if_false @BARB_2335
 if 

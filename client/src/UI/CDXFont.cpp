@@ -2,6 +2,7 @@
 #include "CDXFont.h"
 
 ID3DXFont* CDXFont::m_pD3DXFont;
+ID3DXSprite* CDXFont::m_pSprite;
 uint8_t CDXFont::m_fFontSize;
 
 void CDXFont::InitFont()
@@ -16,10 +17,17 @@ void CDXFont::InitFont()
     CDXFont::m_fFontSize = (uint8_t)fontSize;
 
     D3DXCreateFontW(device, (INT)fontSize, 0, 400, 1, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, ANTIALIASED_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Consolas", &m_pD3DXFont);
+    D3DXCreateSprite(device, &m_pSprite);
+    ms_nFontGeneration++;
 }
 
 void CDXFont::DestroyFont() 
 {
+    if (m_pSprite)
+    {
+        m_pSprite->Release();
+        m_pSprite = NULL;
+    }
     if (!m_pD3DXFont) 
         return;
 
@@ -79,26 +87,40 @@ void CDXFont::DrawSegmentWithShadow(int x, int y, const wchar_t* text, D3DCOLOR 
     rect.right = RsGlobal.maximumWidth;
     rect.bottom = RsGlobal.maximumHeight;
 
+    // one drop shadow instead of a 4-sided outline: every DrawText lays the string out again (~25 us each), and
+    // chat lines, the version label and debug text are drawn every frame
     if (shadowThickness > 0)
     {
-        RECT rightRect = rect;
-        rightRect.left += shadowThickness;
-        m_pD3DXFont->DrawTextW(nullptr, text, -1, &rightRect, 0, shadowColor);
-
-        RECT leftRect = rect;
-        leftRect.left -= shadowThickness;
-        m_pD3DXFont->DrawTextW(nullptr, text, -1, &leftRect, 0, shadowColor);
-
-        RECT bottomRect = rect;
-        bottomRect.top += shadowThickness;
-        m_pD3DXFont->DrawTextW(nullptr, text, -1, &bottomRect, 0, shadowColor);
-
-        RECT topRect = rect;
-        topRect.top -= shadowThickness;
-        m_pD3DXFont->DrawTextW(nullptr, text, -1, &topRect, 0, shadowColor);
+        RECT shadowRect = rect;
+        OffsetRect(&shadowRect, shadowThickness, shadowThickness);
+        m_pD3DXFont->DrawTextW(ms_pBatch, text, -1, &shadowRect, DT_NOCLIP, shadowColor);
     }
 
-    m_pD3DXFont->DrawTextW(nullptr, text, -1, &rect, 0, color);
+    m_pD3DXFont->DrawTextW(ms_pBatch, text, -1, &rect, DT_NOCLIP, color);
+}
+
+void CDXFont::BeginBatch()
+{
+    if (m_pD3DXFont && m_pSprite && !ms_pBatch && SUCCEEDED(m_pSprite->Begin(D3DXSPRITE_ALPHABLEND)))
+        ms_pBatch = m_pSprite;
+}
+
+void CDXFont::EndBatch()
+{
+    if (!ms_pBatch)
+        return;
+    ms_pBatch->End();
+    ms_pBatch = nullptr;
+}
+
+int CDXFont::GetTextWidth(CTextSegment& seg)
+{
+    if (seg.width < 0 || seg.widthFont != ms_nFontGeneration)
+    {
+        seg.width = GetTextWidth(seg.text);
+        seg.widthFont = ms_nFontGeneration;
+    }
+    return seg.width;
 }
 
 int CDXFont::GetTextWidth(const std::wstring& text)
