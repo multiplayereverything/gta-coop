@@ -1,98 +1,8 @@
 #include <windows.h>
-#include "../resource.h"
-#include <CommCtrl.h>
-#include "pcid.h"
-#include "clipboard.h"
 #include "launcher.h"
-#include "registry.h"
 
 #pragma comment(linker, \
     "\"/manifestdependency:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
-
-std::string sSerial;
-std::string sSerialCommand;
-
-INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
-{
-    switch (message)
-    {
-        case WM_INITDIALOG:
-        {
-            SetDlgItemText(hDlg, ID_LABELSERIALTUTORIAL,
-                "IMPORTANT: You are playing the alpha/beta version\r\n"
-                "of CoopAndreas, this version needs a beta test serial key."
-                "\r\nDon't worry, the mod as well as the serial key are completely free.\r\n"
-                "Go to our Discord server, and type in the command below into any"
-                "channel. Note: serial keys are unique for everyone.");
-
-            HINSTANCE hInstance = GetModuleHandle(NULL);
-
-            HICON hIconSmall = (HICON)LoadImage(hInstance, MAKEINTRESOURCE(IDI_ICON1), IMAGE_ICON,
-                GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_DEFAULTCOLOR);
-
-            HICON hIconBig = (HICON)LoadImage(hInstance, MAKEINTRESOURCE(IDI_ICON1), IMAGE_ICON,
-                GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON), LR_DEFAULTCOLOR);
-
-            SendMessage(hDlg, WM_SETICON, ICON_SMALL, (LPARAM)hIconSmall);
-            SendMessage(hDlg, WM_SETICON, ICON_BIG, (LPARAM)hIconBig);
-
-            SetDlgItemText(hDlg, ID_TEXTSERIALPC, sSerialCommand.c_str());
-
-            char szSerial[64] = "";
-
-            if (Registry::GetField(szSerial, sizeof(szSerial), "Serialkey"))
-            {
-                SetDlgItemText(hDlg, ID_EDITSERIALGENERATED, szSerial);
-            }
-
-            return (INT_PTR)TRUE;
-        }
-        case WM_COMMAND:
-        {
-            if (LOWORD(wParam) == ID_BTNCOPYSERIAL)
-            {
-                Clipboard::CopyText(sSerialCommand);
-            }
-            else if (LOWORD(wParam) == ID_BTNLAUNCH)
-            {
-                char szSerialGenerated[64];
-                GetDlgItemText(hDlg, ID_EDITSERIALGENERATED, szSerialGenerated, 64);
-                std::string cmd = "\"gta_sa.exe\" --coop -id " + sSerial + " -serial " + std::string(szSerialGenerated);
-                Launcher::LaunchProcess(cmd);
-            }
-            else if (LOWORD(wParam) == ID_EDITSERIALGENERATED)
-            {
-                if (HIWORD(wParam) == EN_CHANGE)
-                {
-                    char szSerialGenerated[64];
-                    GetDlgItemTextA(hDlg, ID_EDITSERIALGENERATED, szSerialGenerated, sizeof(szSerialGenerated));
-                    Registry::SetField(szSerialGenerated, "Serialkey");
-                }
-            }
-            break;
-        }
-        case WM_NOTIFY:
-        {
-            PNMLINK pNMLink = (PNMLINK)lParam;
-            if (pNMLink->hdr.idFrom == IDC_LINKDISCORDSERVER)
-            {
-                if (pNMLink->hdr.code == NM_CLICK || pNMLink->hdr.code == NM_RETURN)
-                {
-                    ShellExecuteW(NULL, L"open", L"https://discord.gg/Z3ugSgFJMU", NULL, NULL, SW_SHOWNORMAL);
-                    return (INT_PTR)TRUE;
-                }
-            }
-            break;
-        }
-        case WM_CLOSE:
-        {
-            EndDialog(hDlg, 0);
-            _exit(0);
-            return (INT_PTR)TRUE;
-        }
-    }
-    return (INT_PTR)FALSE;
-}
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 {
@@ -109,12 +19,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
         return 1;
     }
 
-    ComputerID serialPC{};
-    sSerial = serialPC.GetUniqueSystemId();
-    sSerialCommand = "/gen " + sSerial;
-    // lets testing\test-local.ps1 start extra game instances without going through this dialog
-    Registry::SetField(sSerial.c_str(), "PcId");
-
-    DialogBoxParam(hInstance, MAKEINTRESOURCE(IDD_DIALOG1), nullptr, DialogProc, 0);
+    // this fork needs no beta serial key: start the game in coop mode right away
+    Launcher::LaunchProcess("\"gta_sa.exe\" --coop");
     return 0;
 }

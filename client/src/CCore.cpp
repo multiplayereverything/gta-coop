@@ -5,7 +5,6 @@
 #include <COpCodeSync.h>
 #include <CCustomMenuManager.h>
 #include <winuser.h>
-#include <CLaunchManager.h>
 #include <Debug/CImGui.h>
 #include "CAutoTest.h"
 
@@ -72,7 +71,6 @@ void CCore::Init()
         CCore::AllocateConsole();
 #endif
     CImGui::Init();
-    CLaunchManager::CollectCommandLineArgs();
     WinMain_AfterWindowInit_ptr = injector::GetBranchDestination(0x748995).as_int();
     patch::RedirectCall(0x748995, WinMain_AfterWindowInit);
     CCustomMenuManager::Init();
