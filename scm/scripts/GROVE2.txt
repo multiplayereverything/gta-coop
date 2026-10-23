@@ -3,6 +3,7 @@
 
 :GROVE2
 script_name 'GROVE2'
+1D20: @GROVE2_3159 // Coop.SetAutotestPassLabel: autotest passmission jumps to this pass routine
 gosub @GROVE2_47
 if 
   has_deatharrest_been_executed 

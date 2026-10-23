@@ -15,11 +15,17 @@ class CAutoTest
 {
 public:
     static inline bool ms_bEnabled = false;
+    // passmission: the next 0735 is_keyboard_key_pressed 83 in a mission script returns true, which is Rockstar's
+    // debug skip in most mission scripts (goto the mission's own pass routine). Retail always returns false.
+    static inline bool ms_bPassRequested = false;
 
     static void Init();
     static void ProcessMenu(CMenuManager* pMenu);
     static void ProcessGame();
+    static void ProcessPad();
     static void OnChatMessage(const char* name, const wchar_t* message);
+    // Coop.SetAutotestPassLabel: remembers the pass routine of the running mission script (label as the script encodes it)
+    static void SetPassLabel(CRunningScript* script, int label);
 
     // appends {"t":tick,"ev":type,...fields} to CoopAndreas\autotest\events.jsonl; fields is a JSON fragment or ""
     static void Event(const char* type, const std::string& fields = "");

@@ -3,6 +3,7 @@
 
 :SYN2
 script_name 'SYN2'
+1D20: @SYN2_31291 // Coop.SetAutotestPassLabel: autotest passmission jumps to this pass routine
 gosub @SYN2_47
 if 
   has_deatharrest_been_executed 

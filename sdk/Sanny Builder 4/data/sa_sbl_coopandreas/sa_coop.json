@@ -64740,6 +64740,23 @@
                         "is_static": true
                     },
                     "short_desc": "Shows the blip only for the given player (the host's ped or a network player's ped), host only"
+                },
+                {
+                    "input": [
+                        {
+                            "name": "pass_label",
+                            "type": "label"
+                        }
+                    ],
+                    "id": "1D20",
+                    "name": "COOP_SET_AUTOTEST_PASS_LABEL",
+                    "num_params": 1,
+                    "class": "Coop",
+                    "member": "SetAutotestPassLabel",
+                    "attrs": {
+                        "is_static": true
+                    },
+                    "short_desc": "Autotest only: registers the mission's pass routine, the autotest passmission command jumps there"
                 }
             ]
         }

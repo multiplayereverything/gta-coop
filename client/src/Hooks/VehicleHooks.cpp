@@ -423,9 +423,70 @@ static void __cdecl CVehicle__operator_delete_Hook(void* data)
     pool->Delete((CVehicle*)data);
 }
 
+// Every vehicle class has a deleting destructor `push esi; mov esi,ecx; call ~Class; test [esp+8],1; je; push esi;
+// call CVehicle::operator delete`. The destructor chain sometimes returns with ESI = 0 (a callee breaking the
+// callee-saved ESI), so operator delete got nullptr: the destroyed vehicle's slot stayed "used" (crash in
+// CWorld::RemoveReferencesToDeletedObject on vtable 0x863C40) or, before the null guard, the free index broke.
+// Call the destructor through this shim, which keeps ESI and counts how often it was clobbered.
+static uintptr_t ms_aDtorSites[24];
+static uintptr_t ms_aDtorTargets[24];
+static int ms_nDtorSites = 0;
+volatile long g_nVehicleDtorEsiClobbered = 0;
+
+static uintptr_t __cdecl FindVehicleDtorTarget(uintptr_t returnAddress)
+{
+    for (int i = 0; i < ms_nDtorSites; i++)
+        if (ms_aDtorSites[i] + 5 == returnAddress)
+            return ms_aDtorTargets[i];
+    return 0;
+}
+
+static void __declspec(naked) VehicleDtorShim()
+{
+    __asm
+    {
+        push esi                    // the deleting destructor's `this` copy
+        push ecx                    // this for the destructor (thiscall)
+        mov eax, [esp + 8]          // our return address = call site + 5
+        push eax
+        call FindVehicleDtorTarget
+        add esp, 4
+        pop ecx
+        call eax                    // ~Class(this)
+        pop eax                     // saved ESI
+        cmp eax, esi
+        je esi_ok
+        lock inc dword ptr [g_nVehicleDtorEsiClobbered]
+        mov esi, eax
+    esi_ok:
+        ret
+    }
+}
+
+static void InjectVehicleDtorShims()
+{
+    // find the deleting destructors by their code pattern in gta_sa's .text
+    for (uint8_t* p = (uint8_t*)0x401000; p < (uint8_t*)0x856000 && ms_nDtorSites < 24; p++)
+    {
+        if (p[0] != 0x56 || p[1] != 0x8B || p[2] != 0xF1 || p[3] != 0xE8 || p[8] != 0xF6 || p[9] != 0x44 || p[10] != 0x24 ||
+            p[11] != 0x08 || p[12] != 0x01 || p[13] != 0x74 || p[15] != 0x56 || p[16] != 0xE8)
+            continue;
+        uintptr_t deleteTarget = (uintptr_t)(p + 21) + *(int32_t*)(p + 17);
+        if (deleteTarget != 0x6E2D90)
+            continue;
+        uintptr_t site = (uintptr_t)(p + 3);
+        ms_aDtorSites[ms_nDtorSites] = site;
+        ms_aDtorTargets[ms_nDtorSites] = site + 5 + *(int32_t*)(p + 4);
+        ms_nDtorSites++;
+        patch::RedirectCall(site, VehicleDtorShim);
+    }
+    logger::info("vehicle deleting destructors shimmed: %d", ms_nDtorSites);
+}
+
 void VehicleHooks::InjectHooks()
 {
     patch::RedirectJump(0x6E2D90, CVehicle__operator_delete_Hook);
+    InjectVehicleDtorShims();
 
     patch::RedirectCall(0x53C1CB, CCarCtrl__RemoveDistantCars_Hook);
 

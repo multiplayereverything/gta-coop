@@ -3,6 +3,7 @@
 
 :BCESAR4
 script_name 'BCESAR4'
+1D20: @BCESAR4_1923 // Coop.SetAutotestPassLabel: autotest passmission jumps to this pass routine
 gosub @BCESAR4_47
 if 
   has_deatharrest_been_executed 

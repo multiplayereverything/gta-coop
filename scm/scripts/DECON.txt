@@ -3,6 +3,7 @@
 
 :DECON
 script_name 'DECON'
+1D20: @DECON_21008 // Coop.SetAutotestPassLabel: autotest passmission jumps to this pass routine
 gosub @DECON_47
 if 
   has_deatharrest_been_executed 

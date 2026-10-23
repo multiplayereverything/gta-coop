@@ -3,6 +3,7 @@
 
 :DOC2
 script_name 'DOC2'
+1D20: @DOC2_13233 // Coop.SetAutotestPassLabel: autotest passmission jumps to this pass routine
 gosub @DOC2_47
 if 
   has_deatharrest_been_executed 

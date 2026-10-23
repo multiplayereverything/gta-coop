@@ -2,6 +2,7 @@
 #include "CommandHooks.h"
 #include "CCustomCommandMgr.h"
 #include "Commands/CCommandAddChatMessage.h"
+#include "CAutoTest.h"
 
 uint16_t nCommand = 0x0;
 CRunningScript* pScript = nullptr;
@@ -10,6 +11,22 @@ bool ProcessCustomCommand()
 {
 	// if is in custom command range
 	uint16_t commandNormalised = (nCommand & 0x7FFF);
+
+	// autotest passmission: answer the debug "S pressed" check of the mission script with true
+	if (commandNormalised == 0x0735 && CAutoTest::ms_bPassRequested && pScript->m_bIsMission)
+	{
+		pScript->m_pCurrentIP += 2;
+		pScript->m_bNotFlag = (nCommand & 0x8000) != 0;
+		pScript->CollectParameters(1);
+		bool pressed = ScriptParams[0] == 83;
+		if (pressed)
+		{
+			CAutoTest::ms_bPassRequested = false;
+			CAutoTest::Event("debug_pass_taken", "\"script\":\"" + std::string(pScript->m_szName, strnlen(pScript->m_szName, 8)) + "\"");
+		}
+		pScript->UpdateCompareFlag(pressed);
+		return true;
+	}
 	if (commandNormalised >= CCustomCommandMgr::MIN_CUSTOM_COMMAND && commandNormalised <= CCustomCommandMgr::MAX_CUSTOM_COMMAND)
 	{
 		pScript->m_pCurrentIP += 2;

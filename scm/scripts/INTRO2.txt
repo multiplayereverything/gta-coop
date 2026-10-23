@@ -2231,7 +2231,9 @@ FOR $temp_int = 0 to 2
     if
         Coop.IsNetworkPlayerActorValid($NETWORK_PLAYER[$temp_int])
     then
-        if not Char.LocateAnyMeans3D($NETWORK_PLAYER[$temp_int], 0, 2491.80, -1667.94, 13.34, 20.0, 20.0, 5.0)
+        // partners anywhere around Ryder's house / Grove St (was 20 m around 2491.8,-1667.9, which left out a partner
+        // parked next to the host at the house marker: the mission never ended)
+        if not Char.LocateAnyMeans3D($NETWORK_PLAYER[$temp_int], 0, 2478.0, -1685.0, 13.34, 30.0, 30.0, 6.0)
         then
             150@ = 0
             Break

@@ -6,6 +6,7 @@ Coop.AddChatMessage("{63c7e8}[CoopAndreas]{ffffff} Everyone gets the texts, cuts
 
 :RYDER2
 script_name 'RYDER2'
+1D20: @RYDER2_41389 // Coop.SetAutotestPassLabel: autotest passmission jumps to this pass routine
 gosub @RYDER2_47
 if 
   has_deatharrest_been_executed 

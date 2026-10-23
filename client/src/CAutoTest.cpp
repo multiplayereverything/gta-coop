@@ -1,8 +1,12 @@
 #include "stdafx.h"
 #include "CAutoTest.h"
+#include "Hooks/VehicleHooks.h"
+#include "CRadarSync.h"
 #include "CCutsceneSkipVote.h"
 #include "COpCodeSync.h"
 #include <CMessages.h>
+#include <C3dMarkers.h>
+#include <CEntryExitManager.h>
 #include <deque>
 #include <filesystem>
 #include <fstream>
@@ -120,6 +124,8 @@ static void PatchGameImport(const char* name, void* replacement)
     }
 }
 
+static void __cdecl UpdatePads_Hook();
+
 void CAutoTest::Init()
 {
     const char* cmd = GetCommandLineA();
@@ -127,6 +133,7 @@ void CAutoTest::Init()
         return;
 
     ms_bEnabled = true;
+    patch::RedirectCall(0x53BEE6, UpdatePads_Hook);
 
     if (strstr(cmd, "-autohide"))
     {
@@ -194,6 +201,15 @@ static CRunningScript* FindMissionScript()
     return nullptr;
 }
 
+static CRunningScript* ms_pPassLabelScript = nullptr;
+static int ms_nPassLabel = 0;
+
+void CAutoTest::SetPassLabel(CRunningScript* script, int label)
+{
+    ms_pPassLabelScript = script;
+    ms_nPassLabel = label;
+}
+
 static std::string GetMissionScriptName()
 {
     CRunningScript* s = FindMissionScript();
@@ -246,7 +262,11 @@ void CAutoTest::DetectMission()
             Event("mission_started", "\"script\":\"" + JsonEscape(GetMissionScriptName()) + "\",\"host\":" +
                                          (CLocalPlayer::m_bIsHost ? "true" : "false"));
         else
+        {
             Event("mission_ended");
+            ms_bPassRequested = false;
+            ms_pPassLabelScript = nullptr;  // the script slot gets reused by the next mission
+        }
     }
 
     std::string nowResult = GetMissionResultMessage();
@@ -386,6 +406,47 @@ void CAutoTest::ProcessMenu(CMenuManager* pMenu)
     pMenu->DoSettingsBeforeStartingAGame();
 }
 
+// press <button> [ms]: held on pad 0 until the deadline, then released (so "just pressed" checks fire once)
+static std::string ms_pressButton;
+static uint32_t ms_nPressUntil = 0;
+
+static signed short* PadButton(CControllerState& s, const std::string& name)
+{
+    if (name == "cross") return &s.ButtonCross;          // sprint / accelerate / shop: buy
+    if (name == "triangle") return &s.ButtonTriangle;    // enter/exit vehicle / shop: leave
+    if (name == "square") return &s.ButtonSquare;
+    if (name == "circle") return &s.ButtonCircle;
+    if (name == "up") return &s.DPadUp;
+    if (name == "down") return &s.DPadDown;
+    if (name == "left") return &s.DPadLeft;
+    if (name == "right") return &s.DPadRight;
+    if (name == "r1") return &s.RightShoulder1;
+    if (name == "l1") return &s.LeftShoulder1;
+    return nullptr;
+}
+
+// CGame::Process reads the pads itself (call to CPad::UpdatePads at 0x53BEE6): apply simulated buttons right after,
+// before scripts and the player read them
+static void __cdecl UpdatePads_Hook()
+{
+    CPad::UpdatePads();
+    CAutoTest::ProcessPad();
+}
+
+void CAutoTest::ProcessPad()
+{
+    if (!ms_bEnabled || ms_pressButton.empty())
+        return;
+    CPad* pad = CPad::GetPad(0);
+    if ((int)(ms_nPressUntil - GetTickCount()) > 0)
+    {
+        if (signed short* b = PadButton(pad->NewState, ms_pressButton))
+            *b = 255;
+    }
+    else
+        ms_pressButton.clear();
+}
+
 void CAutoTest::ProcessGame()
 {
     if (!ms_bEnabled)
@@ -457,17 +518,68 @@ void CAutoTest::WriteStatus(bool inGame)
            << ((CTheScripts::OnAMissionFlag && CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag]) ? "true" : "false")
            << ",\"mission\":\"" << JsonEscape(GetMissionScriptName()) << "\""
            << ",\"cutscene\":\"" << (CCutsceneMgr::ms_running ? JsonEscape(std::string(CCutsceneMgr::ms_cutsceneName, 0, 8)) : "")
-           << "\",\"skipVotes\":" << CCutsceneSkipVote::GetVotes() << ",\"skipVoters\":" << CCutsceneSkipVote::GetVoters();
+           << "\",\"skipVotes\":" << CCutsceneSkipVote::GetVotes() << ",\"skipVoters\":" << CCutsceneSkipVote::GetVoters()
+           << ",\"controlsDisabled\":" << (CPad::GetPad(0)->DisablePlayerControls ? "true" : "false")
+           << ",\"widescreen\":" << (TheCamera.m_bWideScreenOn ? "true" : "false")
+           << ",\"dtorEsiClobbered\":" << g_nVehicleDtorEsiClobbered;
 
         // objective blips: shown, not short-range (shops/contact icons are short-range), no sprite (plain markers)
+        // blips[]: type 1 car, 2 char, 3 object, 4 coord; live entity position, so playthrough scripts can follow
         int blips = 0;
+        std::ostringstream list;
         for (int i = 0; i < MAX_RADAR_TRACES; i++)
         {
             tRadarTrace& t = CRadar::ms_RadarTrace[i];
-            if (t.m_bInUse && t.m_nBlipDisplay != 0 && !t.m_bShortRange && t.m_nRadarSprite == 0)
-                blips++;
+            if (!t.m_bInUse || t.m_nBlipDisplay == 0 || t.m_bShortRange || t.m_nRadarSprite != 0 || !CRadarSync::IsTraceVisible(i))  // only what this player sees (SetBlipVisibleTo)
+                continue;
+            CVector pos = t.m_vecPos;
+            CEntity* entity = t.m_nBlipType == 1   ? (CEntity*)CPools::GetVehicle(t.m_nEntityHandle)
+                              : t.m_nBlipType == 2 ? (CEntity*)CPools::GetPed(t.m_nEntityHandle)
+                              : t.m_nBlipType == 3 ? (CEntity*)CPools::GetObject(t.m_nEntityHandle)
+                                                   : nullptr;
+            if (entity && entity->m_matrix)
+                pos = entity->m_matrix->pos;
+            list << (blips ? "," : "") << "{\"type\":" << (int)t.m_nBlipType << ",\"colour\":" << t.m_nColour
+                 << ",\"x\":" << pos.x << ",\"y\":" << pos.y << ",\"z\":" << pos.z << "}";
+            blips++;
         }
-        js << ",\"objectiveBlips\":" << blips;
+        js << ",\"objectiveBlips\":" << blips << ",\"blips\":[" << list.str() << "]";
+
+        // markers[]: 3D markers drawn this moment (type 1 = the cylinders of "go here" locates and shop/entry markers)
+        js << ",\"markers\":[";
+        int markers = 0;
+        for (int i = 0; i < 32; i++)
+        {
+            C3dMarker& m = C3dMarkers::m_aMarkerArray[i];
+            if (!m.m_bIsUsed)
+                continue;
+            js << (markers++ ? "," : "") << "{\"type\":" << m.m_nType << ",\"x\":" << m.m_mat.pos.x << ",\"y\":" << m.m_mat.pos.y
+               << ",\"z\":" << m.m_mat.pos.z << ",\"size\":" << m.m_fSize << "}";
+        }
+        js << "]";
+
+        // doors[]: entry/exit markers within 40 m (house/shop doors: walking into one moves you through it)
+        js << ",\"doors\":[";
+        int doors = 0;
+        if (CPlayerPed* me = FindPlayerPed(0); me && CEntryExitManager::mp_poolEntryExits)
+        {
+            for (auto e : CEntryExitManager::mp_poolEntryExits)
+            {
+                CVector c((e->m_recEntrance.left + e->m_recEntrance.right) / 2, (e->m_recEntrance.top + e->m_recEntrance.bottom) / 2,
+                    e->m_fEntranceZ);
+                if ((c - me->GetPosition()).Magnitude() > 300.0f)
+                    continue;
+                // where it leads: the linked entry/exit on the other side (or its exit position)
+                CVector to = e->m_vecExitPos;
+                if (e->m_pLink)
+                    to = CVector((e->m_pLink->m_recEntrance.left + e->m_pLink->m_recEntrance.right) / 2,
+                        (e->m_pLink->m_recEntrance.top + e->m_pLink->m_recEntrance.bottom) / 2, e->m_pLink->m_fEntranceZ);
+                js << (doors++ ? "," : "") << "{\"name\":\"" << JsonEscape(std::string(e->m_szName, strnlen(e->m_szName, 8)))
+                   << "\",\"area\":" << (int)e->m_nArea << ",\"x\":" << c.x << ",\"y\":" << c.y << ",\"z\":" << c.z
+                   << ",\"tx\":" << to.x << ",\"ty\":" << to.y << ",\"tz\":" << to.z << "}";
+            }
+        }
+        js << "]";
     }
 
     CPlayerPed* player = inGame ? FindPlayerPed(0) : nullptr;
@@ -487,7 +599,8 @@ void CAutoTest::WriteStatus(bool inGame)
     for (CNetworkPlayer* np : CNetworkPlayerManager::m_pPlayers)
     {
         js << (first ? "" : ",") << "{\"id\":" << np->m_playerId.value() << ",\"name\":\"" << JsonEscape(np->m_Name)
-           << "\",\"hasPed\":" << (np->m_pPed ? "true" : "false") << ",\"isHost\":" << (np->m_bIsHost ? "true" : "false");
+           << "\",\"hasPed\":" << (np->m_pPed ? "true" : "false") << ",\"isHost\":" << (np->m_bIsHost ? "true" : "false")
+           << ",\"interior\":" << (np->m_pPed ? (int)np->m_pPed->m_nAreaCode : -1);
         if (np->m_pPed && np->m_pPed->m_matrix)
         {
             CVector& p = np->m_pPed->m_matrix->pos;
@@ -582,7 +695,11 @@ void CAutoTest::Execute(const std::string& line)
     {
         float x = 0, y = 0, z = 0;
         in >> x >> y >> z;
-        if (player->m_nPedFlags.bInVehicle && player->m_pVehicle)
+        // interiors sit at z ~1000 in their own area: a target on the wrong side of a door means a fall to death
+        // (test scripts acting on a status written just before a door transition)
+        if ((z > 500.0f) != (player->m_nAreaCode != 0))
+            result = "refused: target is on the other side of a door (area " + std::to_string(player->m_nAreaCode) + ")";
+        else if (player->m_nPedFlags.bInVehicle && player->m_pVehicle)
             player->m_pVehicle->Teleport(CVector(x, y, z), false);
         else
             player->Teleport(CVector(x, y, z), false);
@@ -627,7 +744,8 @@ void CAutoTest::Execute(const std::string& line)
     }
     else if (verb == "entermissioncar")
     {
-        // what a player does in most missions: get into the mission vehicle (nearest, within 80 m)
+        // what a player does in most missions: get into the mission vehicle (nearest, within 80 m); a vehicle with a
+        // blip is the objective ("Get on the bike"), so it wins over unmarked ones
         CVehicle* best = nullptr;
         float bestDist = 80.0f;
         for (int i = 0; i < CPools::ms_pVehiclePool->m_nSize; i++)
@@ -636,6 +754,14 @@ void CAutoTest::Execute(const std::string& line)
             if (!v || v->m_nCreatedBy != eVehicleCreatedBy::MISSION_VEHICLE || v->m_pDriver)
                 continue;
             float d = (v->GetPosition() - player->GetPosition()).Magnitude();
+            int ref = CPools::GetVehicleRef(v);
+            for (int t = 0; t < MAX_RADAR_TRACES; t++)
+            {
+                tRadarTrace& trace = CRadar::ms_RadarTrace[t];
+                if (trace.m_bInUse && trace.m_nBlipDisplay != 0 && trace.m_nBlipType == 1 && trace.m_nEntityHandle == ref && d < 200.0f &&
+                    CRadarSync::IsTraceVisible(t))
+                    d -= 1000.0f;
+            }
             if (d < bestDist)
             {
                 bestDist = d;
@@ -646,6 +772,82 @@ void CAutoTest::Execute(const std::string& line)
             Command<Commands::WARP_CHAR_INTO_CAR>(CPools::GetPedRef(player), CPools::GetVehicleRef(best));
         else
             result = best ? "already in a vehicle" : "no free mission vehicle within 80 m";
+    }
+    else if (verb == "enterpassenger")
+    {
+        // ride along: passenger seat of the nearest vehicle another PLAYER drives, within 15 m (never traffic)
+        CVehicle* best = nullptr;
+        float bestDist = 15.0f;
+        for (int i = 0; i < CPools::ms_pVehiclePool->m_nSize; i++)
+        {
+            CVehicle* v = CPools::ms_pVehiclePool->GetAt(i);
+            if (!v || !v->m_pDriver || v->m_pDriver == player || v->m_nNumPassengers >= v->m_nMaxPassengers ||
+                !CNetworkPlayerManager::GetPlayer(v->m_pDriver))
+                continue;
+            float d = (v->GetPosition() - player->GetPosition()).Magnitude();
+            if (d < bestDist)
+            {
+                bestDist = d;
+                best = v;
+            }
+        }
+        if (best && !player->m_nPedFlags.bInVehicle)
+            Command<Commands::WARP_CHAR_INTO_CAR_AS_PASSENGER>(CPools::GetPedRef(player), CPools::GetVehicleRef(best), -1);
+        else
+            result = best ? "already in a vehicle" : "no driven vehicle with a free seat within 15 m";
+    }
+    else if (verb == "walkto")
+    {
+        // walkto x y z: walk there on foot and stop (shop markers want a stopped ped that walked in, not a teleport)
+        float x = 0, y = 0, z = 0;
+        in >> x >> y >> z;
+        if (player->m_nPedFlags.bInVehicle)
+            result = "in a vehicle";
+        else
+            Command<Commands::TASK_GO_STRAIGHT_TO_COORD>(CPools::GetPedRef(player), x, y, z, 4, 8000);
+    }
+    else if (verb == "press")
+    {
+        // press <cross|triangle|square|circle|up|down|left|right|r1|l1> [ms=200]: shop menus, entering cars
+        std::string button;
+        int ms = 200;
+        in >> button >> ms;
+        CControllerState probe{};
+        if (!PadButton(probe, button))
+            result = "unknown button";
+        else
+        {
+            ms_pressButton = button;
+            ms_nPressUntil = GetTickCount() + (uint32_t)ms;
+        }
+    }
+    else if (verb == "interior")
+    {
+        // interior <area>: what an entry marker does to the area code (partners following the host inside)
+        int area = 0;
+        in >> area;
+        Command<Commands::SET_AREA_VISIBLE>(area);
+        Command<Commands::SET_CHAR_AREA_VISIBLE>(CPools::GetPedRef(player), area);
+    }
+    else if (verb == "passmission")
+    {
+        // arms the mission's own debug skip (see ms_bPassRequested): passes through its real pass routine the
+        // next time the script reaches that check; the check sits in a main loop, so it can take a moment.
+        // Missions without that check register their pass routine (Coop.SetAutotestPassLabel): jump there now.
+        CRunningScript* s = FindMissionScript();
+        if (!s)
+            result = "no mission script";
+        else if (s == ms_pPassLabelScript && s->m_nSP >= 1)
+        {
+            // the pass routine ends with `return` back to the main routine (gosub @start -> deatharrest check ->
+            // cleanup -> terminate), so drop any nested gosubs and keep the main routine's return address
+            s->m_nSP = 1;
+            s->m_pCurrentIP = ms_nPassLabel < 0 ? s->m_pBaseIP - ms_nPassLabel : (unsigned char*)CTheScripts::ScriptSpace + ms_nPassLabel;
+            s->m_nWakeTime = 0;
+            Event("debug_pass_taken", "\"script\":\"" + JsonEscape(GetMissionScriptName()) + "\",\"via\":\"label\"");
+        }
+        else
+            ms_bPassRequested = true;
     }
     else if (verb == "failmission")
     {

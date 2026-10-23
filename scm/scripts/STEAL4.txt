@@ -3,6 +3,7 @@
 
 :STEAL4
 script_name 'STEAL4'
+1D20: @STEAL4_30732 // Coop.SetAutotestPassLabel: autotest passmission jumps to this pass routine
 gosub @STEAL4_47
 if 
   has_deatharrest_been_executed 
