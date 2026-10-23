@@ -3,6 +3,7 @@
 
 :MANSON5
 script_name 'MANSON5'
+1D20: @MANSON5_12906 // Coop.SetAutotestPassLabel: autotest passmission jumps to this pass routine
 gosub @MANSON5_47
 if 
   has_deatharrest_been_executed 

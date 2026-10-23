@@ -3,6 +3,7 @@
 
 :WUZI5
 script_name 'WUZI5'
+1D20: @WUZI5_20684 // Coop.SetAutotestPassLabel: autotest passmission jumps to this pass routine
 gosub @WUZI5_47
 if 
   has_deatharrest_been_executed 

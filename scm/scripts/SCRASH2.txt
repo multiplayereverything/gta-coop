@@ -3,6 +3,7 @@
 
 :SCRASH2
 script_name 'SCRASH2'
+1D20: @SCRASH2_21206 // Coop.SetAutotestPassLabel: autotest passmission jumps to this pass routine
 $g_SCrash2_spookKM = 0
 gosub @SCRASH2_54
 if 

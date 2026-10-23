@@ -3,6 +3,7 @@
 
 :MUSIC1
 script_name 'MUSIC1'
+1D20: @MUSIC1_15574 // Coop.SetAutotestPassLabel: autotest passmission jumps to this pass routine
 gosub @MUSIC1_47
 if 
   has_deatharrest_been_executed 

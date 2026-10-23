@@ -3,6 +3,7 @@
 
 :DSKOOL
 script_name 'DSKOOL'
+1D20: @DSKOOL_24495 // Coop.SetAutotestPassLabel: autotest passmission jumps to this pass routine
 gosub @DSKOOL_47
 if 
   has_deatharrest_been_executed 

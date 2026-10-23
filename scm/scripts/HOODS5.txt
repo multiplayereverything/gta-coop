@@ -3,6 +3,7 @@
 
 :HOODS5
 script_name 'HOODS5'
+1D20: @HOODS5_15274 // Coop.SetAutotestPassLabel: autotest passmission jumps to this pass routine
 gosub @HOODS5_251
 if 
   has_deatharrest_been_executed 

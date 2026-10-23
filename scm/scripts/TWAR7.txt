@@ -4,6 +4,7 @@
 :TWAR7
 script_name 'TWAR7'
 Coop.EnableSyncingThisScript()
+1D20: @TWAR7_23183 // Coop.SetAutotestPassLabel: autotest passmission jumps to this pass routine
 
 gosub @TWAR7_47
 if 

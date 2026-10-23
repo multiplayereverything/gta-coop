@@ -3,6 +3,7 @@
 
 :CAT3
 script_name 'CAT3'
+1D20: @CAT3_17066 // Coop.SetAutotestPassLabel: autotest passmission jumps to this pass routine
 gosub @CAT3_1452
 if 
   has_deatharrest_been_executed 

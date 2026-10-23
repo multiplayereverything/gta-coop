@@ -3,6 +3,7 @@
 
 :HEIST2
 script_name 'HEIST2'
+1D20: @HEIST2_18813 // Coop.SetAutotestPassLabel: autotest passmission jumps to this pass routine
 gosub @HEIST2_47
 if 
   has_deatharrest_been_executed 

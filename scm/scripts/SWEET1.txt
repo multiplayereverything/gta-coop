@@ -4,6 +4,7 @@
 :SWEET1
 script_name 'SWEET1'
 Coop.EnableSyncingThisScript()
+1D20: @SWEET1_14731 // Coop.SetAutotestPassLabel: autotest passmission jumps to this pass routine
 
 gosub @SWEET1_468
 if 

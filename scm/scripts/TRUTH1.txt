@@ -3,6 +3,7 @@
 
 :TRUTH1
 script_name 'TRUTH1'
+1D20: @TRUTH1_16397 // Coop.SetAutotestPassLabel: autotest passmission jumps to this pass routine
 gosub @TRUTH1_47
 if 
   has_deatharrest_been_executed 

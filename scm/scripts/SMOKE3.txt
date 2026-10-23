@@ -6,6 +6,7 @@ Coop.AddChatMessage("{63c7e8}[CoopAndreas]{ffffff} Everyone gets the texts, cuts
 
 :SMOKE3
 script_name 'SMOKE3'
+1D20: @SMOKE3_20115 // Coop.SetAutotestPassLabel: autotest passmission jumps to this pass routine
 gosub @SMOKE3_47
 if 
   has_deatharrest_been_executed 

@@ -4,6 +4,7 @@
 :SMOKE2
 script_name 'SMOKE2'
 Coop.EnableSyncingThisScript()
+1D20: @SMOKE2_11352 // Coop.SetAutotestPassLabel: autotest passmission jumps to this pass routine
 
 gosub @SMOKE2_47
 if 

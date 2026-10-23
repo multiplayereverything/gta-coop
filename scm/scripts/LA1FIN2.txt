@@ -3,6 +3,7 @@
 
 :LA1FIN2
 script_name 'LA1FIN2'
+1D20: @LA1FIN2_20103 // Coop.SetAutotestPassLabel: autotest passmission jumps to this pass routine
 gosub @LA1FIN2_339
 if 
   has_deatharrest_been_executed 

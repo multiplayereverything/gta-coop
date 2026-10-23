@@ -3,6 +3,7 @@
 
 :SWEET7
 script_name 'SWEET7'
+1D20: @SWEET7_32422 // Coop.SetAutotestPassLabel: autotest passmission jumps to this pass routine
 gosub @SWEET7_54
 if 
   has_deatharrest_been_executed 

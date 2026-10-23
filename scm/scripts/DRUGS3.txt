@@ -3,6 +3,7 @@
 
 :DRUGS3
 script_name 'DRUGS3'
+1D20: @DRUGS3_19361 // Coop.SetAutotestPassLabel: autotest passmission jumps to this pass routine
 gosub @DRUGS3_47
 if 
   has_deatharrest_been_executed 

@@ -3,6 +3,7 @@
 
 :CRASH1
 script_name 'CRASH1'
+1D20: @CRASH1_41291 // Coop.SetAutotestPassLabel: autotest passmission jumps to this pass routine
 gosub @CRASH1_47
 if 
   has_deatharrest_been_executed 

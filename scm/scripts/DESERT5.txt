@@ -3,6 +3,7 @@
 
 :DESERT5
 script_name 'DESERT5'
+1D20: @DESERT5_29990 // Coop.SetAutotestPassLabel: autotest passmission jumps to this pass routine
 gosub @DESERT5_47
 if 
   has_deatharrest_been_executed 

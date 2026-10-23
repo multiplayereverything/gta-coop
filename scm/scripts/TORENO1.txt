@@ -3,6 +3,7 @@
 
 :TORENO1
 script_name 'TORENO1'
+1D20: @TORENO1_14457 // Coop.SetAutotestPassLabel: autotest passmission jumps to this pass routine
 gosub @TORENO1_47
 if 
   has_deatharrest_been_executed 

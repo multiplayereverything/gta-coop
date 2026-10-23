@@ -3,6 +3,7 @@
 
 :CASINO3
 script_name 'CASINO3'
+1D20: @CASINO3_14129 // Coop.SetAutotestPassLabel: autotest passmission jumps to this pass routine
 gosub @CASINO3_47
 if 
   has_deatharrest_been_executed 

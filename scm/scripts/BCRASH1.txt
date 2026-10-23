@@ -3,6 +3,7 @@
 
 :BCRASH1
 script_name 'BCRASH1'
+1D20: @BCRASH1_13609 // Coop.SetAutotestPassLabel: autotest passmission jumps to this pass routine
 gosub @BCRASH1_922
 if 
   has_deatharrest_been_executed 

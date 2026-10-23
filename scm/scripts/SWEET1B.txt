@@ -4,6 +4,7 @@
 :SWEET1B
 script_name 'SWEET1B'
 Coop.EnableSyncingThisScript()
+1D20: @SWEET1B_mission_sweet1b_passed // Coop.SetAutotestPassLabel: autotest passmission jumps to this pass routine
 
 gosub @SWEET1B_1079
 if 
@@ -541,7 +542,7 @@ for $temp_int = 0 to 2
     if
         Coop.IsNetworkPlayerActorValid($NETWORK_PLAYER[$temp_int])
     then
-        Coop.PrintNowForNetworkPlayer('SWE1_YH', 3000, 1, $NETWORK_PLAYER[$temp_int]) //Let’s just cruise through the hood and find us somebody selling.
+        Coop.PrintNowForNetworkPlayer('SWE1_YH', 3000, 1, $NETWORK_PLAYER[$temp_int]) //Letâ€™s just cruise through the hood and find us somebody selling.
     end
 end
 

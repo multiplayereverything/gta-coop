@@ -3,6 +3,7 @@
 
 :DESERT9
 script_name 'DESERT9'
+1D20: @DESERT9_21869 // Coop.SetAutotestPassLabel: autotest passmission jumps to this pass routine
 gosub @DESERT9_49
 
 :DESERT9_18

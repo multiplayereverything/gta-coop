@@ -3,6 +3,7 @@
 
 :SWEET2
 script_name 'SWEET2'
+1D20: @SWEET2_20304 // Coop.SetAutotestPassLabel: autotest passmission jumps to this pass routine
 Coop.AddChatMessage("{63c7e8}[CoopAndreas]{ffffff} Host-driven mission: the host plays the objectives, partners help.")
 Coop.AddChatMessage("{63c7e8}[CoopAndreas]{ffffff} Everyone gets the texts, cutscenes, money and wanted level.")
 

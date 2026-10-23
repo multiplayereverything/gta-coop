@@ -3,6 +3,7 @@
 
 :DRIV2
 script_name 'DRIV2'
+1D20: @DRIV2_12885 // Coop.SetAutotestPassLabel: autotest passmission jumps to this pass routine
 gosub @DRIV2_47
 if 
   has_deatharrest_been_executed 
