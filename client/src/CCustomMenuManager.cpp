@@ -540,8 +540,15 @@ void InsertCharToRow(char c)
 		}
 		if (c >= '0' && c <= '9')
 		{
+			// ports end at 65535 (m_nPort is 16 bit); refuse the digit instead of wrapping around
+			unsigned long port = strtoul(aRowContent[iActiveInputRow], nullptr, 10) * 10 + (c - '0');
+			if (port > 65535)
+			{
+				return;
+			}
 			aRowContent[iActiveInputRow][length] = c;
-			CNetwork::m_nPort = std::stoi(aRowContent[iActiveInputRow]);
+			aRowContent[iActiveInputRow][length + 1] = '\0';
+			CNetwork::m_nPort = static_cast<unsigned short>(port);
 		}
 		break;
 	}
@@ -586,7 +593,8 @@ void CCustomMenuManager::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 					strncpy_s(CNetwork::m_IpAddress, aRowContent[iActiveInputRow], MAX_LENGTH_PER_ROW[iActiveInputRow]);
 					break;
 				case ROW_PORT:
-					CNetwork::m_nPort = std::stoi(aRowContent[iActiveInputRow]);
+					// std::stoi threw on the empty field after deleting the last digit (crash, KERNELBASE.dll)
+					CNetwork::m_nPort = static_cast<unsigned short>(strtoul(aRowContent[iActiveInputRow], nullptr, 10));
 					break;
 				}
 			}
