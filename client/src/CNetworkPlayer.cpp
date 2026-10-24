@@ -85,6 +85,9 @@ void CNetworkPlayer::Respawn()
 
 int CNetworkPlayer::GetInternalId()  // most used for CWorld::PlayerInFocus
 {
+    if (!m_pPed)  // would match an unused CWorld::Players slot (its ped is null too)
+        return -1;
+
     byte playerNumber = 0;
 
     for (; playerNumber < Config::MAX_SERVER_PLAYERS + 2; playerNumber++)

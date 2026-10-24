@@ -508,6 +508,7 @@ static signed short* PadButton(CControllerState& s, const std::string& name)
     if (name == "right") return &s.DPadRight;
     if (name == "r1") return &s.RightShoulder1;
     if (name == "l1") return &s.LeftShoulder1;
+    if (name == "r3") return &s.ShockButtonR;          // in a taxi/police car/ambulance/fire truck: start the side job
     return nullptr;
 }
 

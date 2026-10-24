@@ -45,6 +45,11 @@ void CNetworkPlayerMapPin::Process()
 {
 	for (auto player : CNetworkPlayerManager::m_pPlayers)
 	{
+		// no ped (just died, being recreated): GetInternalId would match an empty player slot and the angle below
+		// read the missing ped (crash while drawing the radar)
+		if (!player->m_pPed || !player->m_pPed->m_matrix)
+			continue;
+
 		CWorld::PlayerInFocus = player->GetInternalId();
 
 		if (CWorld::PlayerInFocus == -1)
