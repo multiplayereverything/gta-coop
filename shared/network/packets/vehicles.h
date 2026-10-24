@@ -168,6 +168,7 @@ public:
 
     float planeGearState{};
     eDoorLock locked{};
+    vehicleid_t trailerId{};  // trailer hooked on (invalid = none): partners hook it on locally
 
 private:
     template <typename Stream>
@@ -257,6 +258,13 @@ private:
         }
 
         serialize_int(stream, (int&)locked, DOORLOCK_NOT_USED, DOORLOCK_SKIP_SHUT_DOORS);
+
+        bool hasTrailer = Stream::IsWriting && trailerId.valid();
+        serialize_bool(stream, hasTrailer);
+        if (hasTrailer)
+        {
+            serialize_vehicleid(stream, trailerId);
+        }
 
         return true;
     }

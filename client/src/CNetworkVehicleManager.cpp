@@ -94,6 +94,12 @@ void CNetworkVehicleManager::UpdateDriver(CVehicle* pVehicle)
 
 		vehicleDriverUpdate.locked = pVehicle->m_eDoorLock;
 
+		if (pVehicle->m_pTrailer)
+		{
+			if (CNetworkVehicle* pNetworkTrailer = CNetworkVehicleManager::GetVehicle(pVehicle->m_pTrailer))
+				vehicleDriverUpdate.trailerId = pNetworkTrailer->m_vehicleId;
+		}
+
 		GetPacketFactory().Send(vehicleDriverUpdate);
 	}
 }

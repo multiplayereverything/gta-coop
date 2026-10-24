@@ -44,6 +44,10 @@ PACKET_HANDLER(ePacketType::VEHICLE_IDLE_UPDATE, Packets::Vehicles::VehicleIdleU
     if (pNetworkVehicle->m_pVehicle->m_matrix == nullptr)
         return;
 
+    // a trailer hooked on to another player's truck here follows the truck; its own updates would yank it around
+    if (pNetworkVehicle->m_pVehicle->m_pTractor)
+        return;
+
     pNetworkVehicle->m_pVehicle->m_matrix->pos = pVehicleIdleUpdate->pos;
 
     // if (CUtil::IsPositionUpdateNeeded(pNetworkVehicle->m_pVehicle->m_matrix->right, pVehicleIdleUpdate->roll, 1))
@@ -141,6 +145,20 @@ PACKET_HANDLER(ePacketType::VEHICLE_DRIVER_UPDATE, Packets::Vehicles::VehicleDri
     }
 
     pNetworkVehicle->m_pVehicle->m_eDoorLock = pVehicleDriverUpdate->locked;
+    // trailer: hook on the one the driver tows, unhook a dropped one
+    CVehicle* pTrailer = nullptr;
+    if (pVehicleDriverUpdate->trailerId.valid())
+    {
+        if (CNetworkVehicle* pNetworkTrailer = CNetworkVehicleManager::GetVehicle(pVehicleDriverUpdate->trailerId))
+            pTrailer = pNetworkTrailer->m_pVehicle;
+    }
+    if (pVehicle->m_pTrailer != pTrailer)
+    {
+        if (pVehicle->m_pTrailer && pVehicle->m_pTrailer->IsVTableValid())
+            pVehicle->m_pTrailer->BreakTowLink();
+        if (pTrailer && pTrailer->IsVTableValid() && !pTrailer->m_pTractor && pTrailer->m_nVehicleSubType == VEHICLE_TRAILER)
+            pTrailer->SetTowLink(pVehicle, true);
+    }
     pNetworkVehicle->m_playerDriverSnapshot = *pVehicleDriverUpdate;
 }
 

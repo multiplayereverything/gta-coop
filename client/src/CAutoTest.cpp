@@ -628,6 +628,7 @@ void CAutoTest::WriteStatus(bool inGame)
            << ",\"mirroredMarkers\":" << CMissionMarkerSync::GetMirroredCount()
            << ",\"carJitter\":" << (CNetworkVehicleManager::ms_nJitterSamples ? 100.0 * CNetworkVehicleManager::ms_nJitterBackSteps / CNetworkVehicleManager::ms_nJitterSamples : 0.0)
            << ",\"carJitterSamples\":" << CNetworkVehicleManager::ms_nJitterSamples << ",\"carSnaps\":" << CNetworkVehicleManager::ms_nSnaps
+           << ",\"towing\":" << [] { int n = 0; for (CNetworkVehicle* v : CNetworkVehicleManager::m_pVehicles) if (v->m_pVehicle && v->m_pVehicle->m_pTrailer && v->m_pVehicle->m_pTrailer->m_matrix && (v->m_pVehicle->m_pTrailer->GetPosition() - v->m_pVehicle->GetPosition()).Magnitude() < 20.0f) n++; return n; }()
            << ",\"missionPickups\":" << CMissionPickupSync::GetCount() << ",\"missionFires\":" << CMissionFireSync::GetCount()
            << ",\"minigame\":" << (CTheScripts::bMiniGameInProgress ? "true" : "false")
            << ",\"coopUs\":{\"net\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::NET] << ",\"process\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PROCESS] << ",\"draw\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::DRAW] << ",\"autotest\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::AUTOTEST] << ",\"peds\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PEDS] << ",\"vehicles\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::VEHICLES] << ",\"tags\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::TAGS] << ",\"chatAndRest\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::CHAT] << ",\"playerList\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PLAYERLIST] << ",\"checkpoint\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::CHECKPOINT] << ",\"input\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::INPUT] << ",\"version\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::VERSION] << "}"
@@ -986,6 +987,26 @@ void CAutoTest::Execute(const std::string& line)
             bool burning = handle && index < MAX_NUM_FIRES && gFireManager.m_aFires[index].m_nFlags.bActive;
             result = std::string("burning=") + (burning ? "true" : "false");
         }
+    }
+    else if (verb == "trailer")
+    {
+        // trailer <model>: a trailer behind the vehicle the player drives, hooked on (attach_trailer_to_cab)
+        int model = 0;
+        in >> model;
+        if (player->m_nPedFlags.bInVehicle && player->m_pVehicle)
+        {
+            CVehicle* cab = player->m_pVehicle;
+            CVector behind = cab->GetPosition() - cab->m_matrix->up * 10.0f;
+            Command<Commands::REQUEST_MODEL>(model);
+            Command<Commands::LOAD_ALL_MODELS_NOW>();
+            int trailer = -1;
+            Command<Commands::CREATE_CAR>(model, behind.x, behind.y, behind.z + 0.5f, &trailer);
+            Command<Commands::SET_CAR_HEADING>(trailer, cab->GetHeading() * 180.0f / 3.14159265f);
+            Command<Commands::ATTACH_TRAILER_TO_CAB>(trailer, CPools::GetVehicleRef(cab));
+            result = "trailer=" + std::to_string(trailer);
+        }
+        else
+            result = "not in a vehicle";
     }
     else if (verb == "checkpoint")
     {
