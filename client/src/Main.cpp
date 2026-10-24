@@ -37,6 +37,8 @@
 #include "CAreaConsistency.h"
 #include "CCustomMenuManager.h"
 #include "CCoopPerf.h"
+#include "CMissionMarkerSync.h"
+#include "CMissionPickupSync.h"
 
 unsigned int lastOnFootSyncTickRate = 0;
 unsigned int lastDriverSyncTickRate = 0;
@@ -147,6 +149,7 @@ public:
                 CPassengerEnter::Process();
                 CCommandTeleportPlayersToHostSafely::ProcessPendingTeleport();
                 CMissionPartnerVehicles::Process();
+                CMissionPickupSync::Process();
 
                 CPlayerPed* localPlayer = FindPlayerPed(0);
 
@@ -281,7 +284,7 @@ public:
                 CEntryExitMarkerSync::Send();
             }*/
 
-            { CCoopPerf::Scope p(CCoopPerf::CHECKPOINT); CNetworkCheckpoint::Process(); }
+            { CCoopPerf::Scope p(CCoopPerf::CHECKPOINT); CNetworkCheckpoint::Process(); CMissionMarkerSync::Process(); }
             { CCoopPerf::Scope p(CCoopPerf::TAGS); CNetworkPlayerNameTag::Process(); }
             {
                 CCoopPerf::Scope pChat(CCoopPerf::CHAT);

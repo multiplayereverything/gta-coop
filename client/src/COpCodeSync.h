@@ -90,6 +90,8 @@ public:
 	static void Init();
 	static CRunningScript* GetLastProcessedScript();
 	static bool IsScriptSynced(CRunningScript* script);
+	// the script running right now is a story mission not ported to coop (host-run, see the fallback opcodes)
+	static bool IsCurrentScriptUnportedMission();
 	static void HandlePacket(const uint8_t* buffer, int bufferSize);
 	static std::vector<uint8_t> COpCodeSync::SerializeOpcode(int idx, int& outSize);
 	static bool COpCodeSync::IsOpcodeSyncable(int opcode, int* opcodeIdx = nullptr, bool ignoreOpCodeSync = false);

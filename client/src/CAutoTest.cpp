@@ -1,12 +1,16 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "CAutoTest.h"
 #include "Hooks/VehicleHooks.h"
 #include "CRadarSync.h"
 #include "CCutsceneSkipVote.h"
 #include "COpCodeSync.h"
 #include "CCoopPerf.h"
+#include "CMissionMarkerSync.h"
+#include "CMissionPickupSync.h"
 #include <CMessages.h>
 #include <C3dMarkers.h>
+#include <CPickups.h>
+#include <CCheckpoints.h>
 #include <CEntryExitManager.h>
 #include <deque>
 #include <filesystem>
@@ -127,6 +131,76 @@ static void PatchGameImport(const char* name, void* replacement)
 
 static void __cdecl UpdatePads_Hook();
 
+// test runs only: when the game loop stops (a hang, no crash log), write where the main thread is stuck to hang.txt:
+// EIP and the return addresses found on its stack, with the module they belong to
+static DWORD ms_nMainThreadId = 0;
+static volatile LONG ms_nHeartbeat = 0;
+
+static std::string DescribeAddress(DWORD address)
+{
+    char text[300];
+    HMODULE module = nullptr;
+    char name[MAX_PATH] = "?";
+    if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCSTR)address, &module))
+    {
+        GetModuleFileNameA(module, name, sizeof(name));
+        snprintf(text, sizeof(text), "0x%08X %s+0x%X", address, fs::path(name).filename().string().c_str(), address - (DWORD)module);
+    }
+    else
+        snprintf(text, sizeof(text), "0x%08X", address);
+    return text;
+}
+
+static DWORD WINAPI HangWatchdog(LPVOID)
+{
+    LONG last = -1;
+    int staleSeconds = 0, reports = 0;
+    while (reports < 3)
+    {
+        Sleep(1000);
+        LONG now = ms_nHeartbeat;
+        staleSeconds = (now == last) ? staleSeconds + 1 : 0;
+        last = now;
+        if (now == 0 || staleSeconds < 8)
+            continue;
+        staleSeconds = 0;
+        reports++;
+
+        HANDLE thread = OpenThread(THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT, FALSE, ms_nMainThreadId);
+        if (!thread)
+            continue;
+        CONTEXT ctx{};
+        ctx.ContextFlags = CONTEXT_CONTROL | CONTEXT_INTEGER;
+        std::ostringstream out;
+        if (SuspendThread(thread) != (DWORD)-1)
+        {
+            if (GetThreadContext(thread, &ctx))
+            {
+                out << "hang (no frame for 8 s) EIP " << DescribeAddress(ctx.Eip) << " ESP 0x" << std::hex << ctx.Esp << std::dec << '\n';
+                DWORD* stack = (DWORD*)ctx.Esp;
+                for (int i = 0; i < 1024 && !IsBadReadPtr(stack + i, 4); i++)
+                {
+                    DWORD v = stack[i];
+                    HMODULE m = nullptr;
+                    if (v > 0x10000 && GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCSTR)v, &m))
+                        out << "  [esp+" << i * 4 << "] " << DescribeAddress(v) << '\n';
+                }
+            }
+            ResumeThread(thread);
+        }
+        CloseHandle(thread);
+        std::ofstream file(ms_dir / "hang.txt", std::ios::app);
+        file << out.str() << '\n';
+    }
+    return 0;
+}
+
+static void StartHangWatchdog()
+{
+    ms_nMainThreadId = GetCurrentThreadId();
+    CreateThread(nullptr, 0, HangWatchdog, nullptr, 0, nullptr);
+}
+
 void CAutoTest::Init()
 {
     const char* cmd = GetCommandLineA();
@@ -165,6 +239,7 @@ void CAutoTest::Init()
     }
     std::error_code ec;
     fs::create_directories(ms_dir, ec);
+    StartHangWatchdog();
 
     Event("boot", "\"ip\":\"" + JsonEscape(ms_ip) + "\",\"port\":" + std::to_string(ms_port) + ",\"name\":\"" +
                       JsonEscape(ms_name) + "\",\"version\":\"" COOPANDREAS_VERSION "\"");
@@ -377,6 +452,7 @@ void CAutoTest::ProcessMenu(CMenuManager* pMenu)
 {
     if (!ms_bEnabled)
         return;
+    InterlockedIncrement(&ms_nHeartbeat);
 
     DetectChanges();
     WriteStatus(false);
@@ -458,6 +534,7 @@ void CAutoTest::ProcessGame()
 {
     if (!ms_bEnabled)
         return;
+    InterlockedIncrement(&ms_nHeartbeat);
 
     static bool firstFrame = true;
     if (firstFrame)
@@ -546,6 +623,8 @@ void CAutoTest::WriteStatus(bool inGame)
            << ",\"pedState\":" << (FindPlayerPed(0) ? (int)FindPlayerPed(0)->m_ePedState : -1)
            << ",\"task\":" << (FindPlayerPed(0) && FindPlayerPed(0)->m_pIntelligence->m_TaskMgr.GetActiveTask() ? (int)FindPlayerPed(0)->m_pIntelligence->m_TaskMgr.GetActiveTask()->GetTaskType() : -1)
            << ",\"focus\":" << (int)CWorld::PlayerInFocus << "}"
+           << ",\"mirroredMarkers\":" << CMissionMarkerSync::GetMirroredCount()
+           << ",\"missionPickups\":" << CMissionPickupSync::GetCount()
            << ",\"minigame\":" << (CTheScripts::bMiniGameInProgress ? "true" : "false")
            << ",\"coopUs\":{\"net\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::NET] << ",\"process\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PROCESS] << ",\"draw\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::DRAW] << ",\"autotest\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::AUTOTEST] << ",\"peds\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PEDS] << ",\"vehicles\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::VEHICLES] << ",\"tags\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::TAGS] << ",\"chatAndRest\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::CHAT] << ",\"playerList\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PLAYERLIST] << ",\"checkpoint\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::CHECKPOINT] << ",\"input\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::INPUT] << ",\"version\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::VERSION] << "}"
            << ",\"widescreen\":" << (TheCamera.m_bWideScreenOn ? "true" : "false")
@@ -572,8 +651,21 @@ void CAutoTest::WriteStatus(bool inGame)
                                                    : nullptr;
             if (entity && entity->m_matrix)
                 pos = entity->m_matrix->pos;
+            std::string pickupInfo;
+            if (t.m_nBlipType == 7)  // pickup: its type and model, or -1 when this game has no such pickup
+            {
+                int index = CPickups::GetActualPickupIndex(t.m_nEntityHandle);
+                if (index != -1)
+                {
+                    pos = CPickups::aPickUps[index].GetPosn();
+                    pickupInfo = ",\"pickupType\":" + std::to_string(CPickups::aPickUps[index].m_nPickupType) + ",\"model\":" +
+                                 std::to_string(CPickups::aPickUps[index].m_nModelIndex);
+                }
+                else
+                    pickupInfo = ",\"pickupType\":-1";
+            }
             list << (blips ? "," : "") << "{\"type\":" << (int)t.m_nBlipType << ",\"colour\":" << t.m_nColour
-                 << ",\"x\":" << pos.x << ",\"y\":" << pos.y << ",\"z\":" << pos.z << "}";
+                 << ",\"x\":" << pos.x << ",\"y\":" << pos.y << ",\"z\":" << pos.z << pickupInfo << "}";
             blips++;
         }
         js << ",\"objectiveBlips\":" << blips << ",\"blips\":[" << list.str() << "]";
@@ -588,6 +680,19 @@ void CAutoTest::WriteStatus(bool inGame)
                 continue;
             js << (markers++ ? "," : "") << "{\"type\":" << m.m_nType << ",\"x\":" << m.m_mat.pos.x << ",\"y\":" << m.m_mat.pos.y
                << ",\"z\":" << m.m_mat.pos.z << ",\"size\":" << m.m_fSize << "}";
+        }
+        js << "]";
+
+        // checkpoints[]: race-style checkpoints (CCheckpoints, rings/arrows of races and chases)
+        js << ",\"checkpoints\":[";
+        int checkpoints = 0;
+        for (int i = 0; i < 32; i++)
+        {
+            CCheckpoint& c = CCheckpoints::m_aCheckPtArray[i];
+            if (!c.m_bIsUsed)
+                continue;
+            js << (checkpoints++ ? "," : "") << "{\"type\":" << c.m_nType << ",\"x\":" << c.m_vecPosition.x << ",\"y\":" << c.m_vecPosition.y
+               << ",\"z\":" << c.m_vecPosition.z << "}";
         }
         js << "]";
 
@@ -818,6 +923,45 @@ void CAutoTest::Execute(const std::string& line)
                 count++;
         }
         result = "count=" + std::to_string(count);
+    }
+    else if (verb == "pickup")
+    {
+        // pickup create <model> <x> <y> <z>: a mission-style pickup (create_pickup, type 3 = once);
+        // pickup state: whether the script would see it collected (has_pickup_been_collected)
+        static int handle = 0;
+        std::string what;
+        in >> what;
+        if (what == "create")
+        {
+            int model = 0;
+            float x = 0, y = 0, z = 0;
+            in >> model >> x >> y >> z;
+            Command<Commands::CREATE_PICKUP>(model, 3, x, y, z, &handle);
+            result = "handle=" + std::to_string(handle);
+        }
+        else
+            result = std::string("collected=") + (handle && CPickups::IsPickUpPickedUp(handle) ? "true" : "false");
+    }
+    else if (verb == "checkpoint")
+    {
+        // checkpoint create <x> <y> <z> | checkpoint delete: a script race checkpoint (create_checkpoint 06D5)
+        static int handle = 0;
+        std::string what;
+        in >> what;
+        if (what == "create")
+        {
+            float x = 0, y = 0, z = 0;
+            in >> x >> y >> z;
+            if (handle)
+                Command<0x06D6>(handle);
+            Command<0x06D5>(1, x, y, z, x + 10.0f, y, z, 4.0f, &handle);
+            result = "handle=" + std::to_string(handle);
+        }
+        else if (handle)
+        {
+            Command<0x06D6>(handle);
+            handle = 0;
+        }
     }
     else if (verb == "nowanted")
     {

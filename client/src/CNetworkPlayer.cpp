@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "Commands/Commands/CCommandCollectNetworkPlayersForTheMission.h"
 #include <CTaskSimpleCarSetPedOut.h>
 #include <CCarEnterExit.h>
 #include <CTaskSimpleCarSetPedInAsPassenger.h>
@@ -71,12 +72,15 @@ void CNetworkPlayer::DestroyPed()
 
 void CNetworkPlayer::Respawn()
 {
+    int oldRef = m_pPed ? CPools::GetPedRef(m_pPed) : 0;
     if (m_pPed)
     {
         this->DestroyPed();
     }
 
     this->CreatePed(m_onFootSnapshotInterpolated.vecPos);
+    if (m_pPed)
+        CCommandCollectNetworkPlayersForTheMission::OnNetworkPlayerPedReplaced(oldRef, CPools::GetPedRef(m_pPed));
 }
 
 int CNetworkPlayer::GetInternalId()  // most used for CWorld::PlayerInFocus

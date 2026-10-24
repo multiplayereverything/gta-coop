@@ -23,3 +23,28 @@ PACKET_HANDLER(ePacketType::REMOVE_CHECKPOINT, Packets::Blips::RemoveCheckpoint*
         }
     }
 }
+
+PACKET_HANDLER(ePacketType::MISSION_MARKERS, Packets::Blips::MissionMarkers* pMissionMarkers, CNetworkPlayer* pNetworkPlayer)
+{
+    if (pNetworkPlayer->m_bIsHost)
+    {
+        GetPacketFactory().SendToAll(*pMissionMarkers, pNetworkPlayer);
+    }
+}
+
+PACKET_HANDLER(ePacketType::MISSION_PICKUPS, Packets::Blips::MissionPickups* pMissionPickups, CNetworkPlayer* pNetworkPlayer)
+{
+    if (pNetworkPlayer->m_bIsHost)
+    {
+        GetPacketFactory().SendToAll(*pMissionPickups, pNetworkPlayer);
+    }
+}
+
+PACKET_HANDLER(ePacketType::MISSION_PICKUP_COLLECTED, Packets::Blips::MissionPickupCollected* pMissionPickupCollected, CNetworkPlayer* pNetworkPlayer)
+{
+    CNetworkPlayer* pHost = CNetworkPlayerManager::GetHost();
+    if (pHost && pHost != pNetworkPlayer)
+    {
+        GetPacketFactory().Send(*pMissionPickupCollected, pHost);
+    }
+}

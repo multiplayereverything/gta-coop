@@ -1211,3 +1211,7 @@ void COpCodeSync::Init()
     FinishedProcessingScripts_ptr = injector::GetBranchDestination(0x46A22E).as_int();
     patch::RedirectCall(0x46A22E, FinishedProcessingScripts);
 }
+bool COpCodeSync::IsCurrentScriptUnportedMission()
+{
+    return IsUnportedMissionScript(lastProcessedScript) && !IsScriptSynced(lastProcessedScript);
+}

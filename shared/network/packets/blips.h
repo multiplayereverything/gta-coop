@@ -39,4 +39,123 @@ private:
         return true;
     }
 };
+// what the host's host-run (unported) mission draws this moment: "go here" areas of locate commands and race
+// checkpoints, so partners see the same markers (sent when it changes, at most 5 times a second)
+class MissionMarkers : public Packet
+{
+    DEFINE_PACKET_TYPE(MissionMarkers, ePacketType::MISSION_MARKERS, ePacketChannel::SCRIPT);
+
+public:
+    static constexpr int MAX_AREAS = 8;
+    static constexpr int MAX_CHECKPOINTS = 8;
+
+    struct Area
+    {
+        int32_t id = 0;
+        float fromX = 0, fromY = 0, toX = 0, toY = 0, z = 0;
+    };
+    struct Checkpoint
+    {
+        int32_t id = 0;
+        uint16_t type = 0;
+        CVector position{}, direction{};
+        float size = 0;
+        uint8_t r = 0, g = 0, b = 0, a = 0;
+        uint16_t pulsePeriod = 0;
+        float pulseFraction = 0;
+        int16_t rotateRate = 0;
+    };
+
+    uint8_t numAreas = 0;
+    Area areas[MAX_AREAS]{};
+    uint8_t numCheckpoints = 0;
+    Checkpoint checkpoints[MAX_CHECKPOINTS]{};
+
+private:
+    template <typename Stream>
+    bool Serialize(Stream& stream)
+    {
+        serialize_int(stream, numAreas, 0, MAX_AREAS);
+        for (int i = 0; i < numAreas; i++)
+        {
+            serialize_bits(stream, areas[i].id, 32);
+            serialize_float(stream, areas[i].fromX);
+            serialize_float(stream, areas[i].fromY);
+            serialize_float(stream, areas[i].toX);
+            serialize_float(stream, areas[i].toY);
+            serialize_float(stream, areas[i].z);
+        }
+        serialize_int(stream, numCheckpoints, 0, MAX_CHECKPOINTS);
+        for (int i = 0; i < numCheckpoints; i++)
+        {
+            Checkpoint& c = checkpoints[i];
+            serialize_bits(stream, c.id, 32);
+            serialize_bits(stream, c.type, 16);
+            serialize_vector(stream, c.position);
+            serialize_vector(stream, c.direction);
+            serialize_float(stream, c.size);
+            serialize_bits(stream, c.r, 8);
+            serialize_bits(stream, c.g, 8);
+            serialize_bits(stream, c.b, 8);
+            serialize_bits(stream, c.a, 8);
+            serialize_bits(stream, c.pulsePeriod, 16);
+            serialize_float(stream, c.pulseFraction);
+            serialize_bits(stream, c.rotateRate, 16);
+        }
+        return true;
+    }
+};
+// pickups the host's current mission created (host -> partners, sent when the list changes)
+class MissionPickups : public Packet
+{
+    DEFINE_PACKET_TYPE(MissionPickups, ePacketType::MISSION_PICKUPS, ePacketChannel::SCRIPT);
+
+public:
+    static constexpr int MAX_PICKUPS = 16;
+
+    struct Pickup
+    {
+        int32_t handle = 0;  // the host's pickup handle
+        uint16_t model = 0;
+        uint8_t type = 0;
+        CVector position{};
+        uint32_t ammo = 0;
+    };
+
+    uint8_t count = 0;
+    Pickup pickups[MAX_PICKUPS]{};
+
+private:
+    template <typename Stream>
+    bool Serialize(Stream& stream)
+    {
+        serialize_int(stream, count, 0, MAX_PICKUPS);
+        for (int i = 0; i < count; i++)
+        {
+            serialize_bits(stream, pickups[i].handle, 32);
+            serialize_bits(stream, pickups[i].model, 16);
+            serialize_bits(stream, pickups[i].type, 8);
+            serialize_vector(stream, pickups[i].position);
+            serialize_bits(stream, pickups[i].ammo, 32);
+        }
+        return true;
+    }
+};
+
+// a partner collected its copy of a mission pickup (partner -> host): the host counts it as collected
+class MissionPickupCollected : public Packet
+{
+    DEFINE_PACKET_TYPE(MissionPickupCollected, ePacketType::MISSION_PICKUP_COLLECTED, ePacketChannel::SCRIPT);
+
+public:
+    int32_t handle = 0;
+
+private:
+    template <typename Stream>
+    bool Serialize(Stream& stream)
+    {
+        serialize_bits(stream, handle, 32);
+        return true;
+    }
+};
 }  // namespace Packets::Blips
