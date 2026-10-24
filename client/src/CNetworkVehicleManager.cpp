@@ -217,3 +217,58 @@ void CNetworkVehicleManager::UpdateDamageSync()
 		}
 	}
 }
+void CNetworkVehicleManager::ProcessSmoothing()
+{
+    uint32_t now = GetTickCount();
+    for (CNetworkVehicle* networkVehicle : m_pVehicles)
+    {
+        CVehicle* vehicle = networkVehicle->m_pVehicle;
+        // only cars another player is driving right now (driver updates within the last second)
+        if (!vehicle || !vehicle->m_matrix || networkVehicle->m_nSyncedAt == 0 || now - networkVehicle->m_nSyncedAt > 1000 ||
+            !vehicle->m_pDriver || vehicle->m_pDriver == FindPlayerPed(0))
+        {
+            networkVehicle->m_vecLastFramePos = vehicle && vehicle->m_matrix ? vehicle->GetPosition() : CVector();
+            continue;
+        }
+
+        CVector current = vehicle->GetPosition();
+        if (ms_bSmoothing)
+        {
+            // where the driver's car is now: last synced position moved on by its speed (units per 50 fps frame)
+            float frames = (std::min)(now - networkVehicle->m_nSyncedAt, 200u) / 20.0f;
+            CVector predicted = networkVehicle->m_vecSyncedPos + networkVehicle->m_vecSyncedSpeed * frames;
+            CVector error = predicted - current;
+            float k = (std::min)(1.0f, ms_fSmoothingStrength * CTimer::ms_fTimeStep);
+            CVector speed = networkVehicle->m_vecSyncedSpeed;
+            if (error.Magnitude() > SNAP_DISTANCE)
+            {
+                vehicle->m_matrix->pos = predicted;
+                ms_nSnaps++;
+            }
+            else if (speed.Magnitude() * 50.0f < 1.0f)
+                vehicle->m_matrix->pos = current + error * k;
+            else
+            {
+                // never pull a moving car back (that is the visible jump): sideways errors are corrected, a car behind
+                // the prediction is pushed on, a car ahead of it is slowed down a little until the driver catches up
+                CVector dir = speed;
+                dir.Normalise();
+                float along = error.x * dir.x + error.y * dir.y + error.z * dir.z;
+                CVector lateral = error - dir * along;
+                vehicle->m_matrix->pos = current + lateral * k + (along > 0.0f ? dir * (along * k) : CVector());
+                vehicle->m_vecMoveSpeed = speed * (along < 0.0f ? (std::max)(0.6f, 1.0f + along * 0.2f) : 1.0f);
+            }
+        }
+
+        // metric: a moving car that steps against its own direction of travel jumped back
+        CVector step = vehicle->GetPosition() - networkVehicle->m_vecLastFramePos;
+        CVector speed = networkVehicle->m_vecSyncedSpeed;
+        if (speed.Magnitude() * 50.0f > 3.0f && step.Magnitude() < 5.0f)
+        {
+            ms_nJitterSamples++;
+            if (step.x * speed.x + step.y * speed.y + step.z * speed.z < 0.0f)
+                ms_nJitterBackSteps++;
+        }
+        networkVehicle->m_vecLastFramePos = vehicle->GetPosition();
+    }
+}

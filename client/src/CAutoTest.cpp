@@ -624,6 +624,8 @@ void CAutoTest::WriteStatus(bool inGame)
            << ",\"task\":" << (FindPlayerPed(0) && FindPlayerPed(0)->m_pIntelligence->m_TaskMgr.GetActiveTask() ? (int)FindPlayerPed(0)->m_pIntelligence->m_TaskMgr.GetActiveTask()->GetTaskType() : -1)
            << ",\"focus\":" << (int)CWorld::PlayerInFocus << "}"
            << ",\"mirroredMarkers\":" << CMissionMarkerSync::GetMirroredCount()
+           << ",\"carJitter\":" << (CNetworkVehicleManager::ms_nJitterSamples ? 100.0 * CNetworkVehicleManager::ms_nJitterBackSteps / CNetworkVehicleManager::ms_nJitterSamples : 0.0)
+           << ",\"carJitterSamples\":" << CNetworkVehicleManager::ms_nJitterSamples << ",\"carSnaps\":" << CNetworkVehicleManager::ms_nSnaps
            << ",\"missionPickups\":" << CMissionPickupSync::GetCount()
            << ",\"minigame\":" << (CTheScripts::bMiniGameInProgress ? "true" : "false")
            << ",\"coopUs\":{\"net\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::NET] << ",\"process\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PROCESS] << ",\"draw\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::DRAW] << ",\"autotest\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::AUTOTEST] << ",\"peds\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PEDS] << ",\"vehicles\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::VEHICLES] << ",\"tags\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::TAGS] << ",\"chatAndRest\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::CHAT] << ",\"playerList\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PLAYERLIST] << ",\"checkpoint\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::CHECKPOINT] << ",\"input\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::INPUT] << ",\"version\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::VERSION] << "}"
@@ -896,6 +898,8 @@ void CAutoTest::Execute(const std::string& line)
         CNetworkPedManager::ms_fSmoothingStrength = strength;
         CNetworkPedManager::ms_fJitterSum = CNetworkPedManager::ms_fOwnJitterSum = 0.0;
         CNetworkPedManager::ms_nJitterSamples = CNetworkPedManager::ms_nOwnJitterSamples = 0;
+        CNetworkVehicleManager::ms_bSmoothing = on != 0;  // cars driven by other players too
+        CNetworkVehicleManager::ms_nJitterSamples = CNetworkVehicleManager::ms_nJitterBackSteps = CNetworkVehicleManager::ms_nSnaps = 0;
     }
     else if (verb == "enex")
     {
@@ -941,6 +945,22 @@ void CAutoTest::Execute(const std::string& line)
         }
         else
             result = std::string("collected=") + (handle && CPickups::IsPickUpPickedUp(handle) ? "true" : "false");
+    }
+    else if (verb == "carto")
+    {
+        // carto <x> <y> <z> <heading>: put the car the player drives there, standing still (repeatable test drives)
+        float x = 0, y = 0, z = 0, heading = 0;
+        in >> x >> y >> z >> heading;
+        if (player->m_nPedFlags.bInVehicle && player->m_pVehicle)
+        {
+            int car = CPools::GetVehicleRef(player->m_pVehicle);
+            Command<Commands::SET_CAR_COORDINATES>(car, x, y, z);
+            Command<Commands::SET_CAR_HEADING>(car, heading);
+            player->m_pVehicle->m_vecMoveSpeed = CVector();
+            player->m_pVehicle->m_vecTurnSpeed = CVector();
+        }
+        else
+            result = "not in a vehicle";
     }
     else if (verb == "checkpoint")
     {

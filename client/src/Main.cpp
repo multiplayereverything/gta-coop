@@ -242,6 +242,7 @@ public:
                 CAimSync::ProcessSyncing();
 
                 { CCoopPerf::Scope p(CCoopPerf::PEDS); CNetworkPedManager::Process(); }
+                CNetworkVehicleManager::ProcessSmoothing();
 
                 static uint32_t crashHotkeyPressedAt = 0;
 

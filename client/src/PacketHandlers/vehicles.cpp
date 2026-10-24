@@ -89,7 +89,18 @@ PACKET_HANDLER(ePacketType::VEHICLE_DRIVER_UPDATE, Packets::Vehicles::VehicleDri
         pNetworkPlayer->WarpIntoVehicleDriver(pVehicle);
     }
 
-    pVehicle->m_matrix->pos = pVehicleDriverUpdate->pos;
+    // with smoothing the position is only snapped on the first update or when far off; ProcessSmoothing glides it
+    uint32_t now = GetTickCount();
+    bool fresh = pNetworkVehicle->m_nSyncedAt == 0 || now - pNetworkVehicle->m_nSyncedAt > 1000;
+    if (!CNetworkVehicleManager::ms_bSmoothing || fresh ||
+        (pVehicle->GetPosition() - pVehicleDriverUpdate->pos).Magnitude() > CNetworkVehicleManager::SNAP_DISTANCE)
+    {
+        pVehicle->m_matrix->pos = pVehicleDriverUpdate->pos;
+        CNetworkVehicleManager::ms_nSnaps++;
+    }
+    pNetworkVehicle->m_vecSyncedPos = pVehicleDriverUpdate->pos;
+    pNetworkVehicle->m_vecSyncedSpeed = pVehicleDriverUpdate->velocity;
+    pNetworkVehicle->m_nSyncedAt = now;
     pVehicle->m_matrix->right = pVehicleDriverUpdate->roll;
     pVehicle->m_matrix->up = pVehicleDriverUpdate->rot;
     pVehicle->m_vecMoveSpeed = pVehicleDriverUpdate->velocity;
