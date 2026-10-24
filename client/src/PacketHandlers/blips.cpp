@@ -4,6 +4,7 @@
 #include <CNetworkCheckpoint.h>
 #include "CMissionMarkerSync.h"
 #include "CMissionPickupSync.h"
+#include "CMissionFireSync.h"
 
 PACKET_HANDLER(ePacketType::UPDATE_CHECKPOINT, Packets::Blips::UpdateCheckpoint* pUpdateCheckpoint)
 {
@@ -43,4 +44,20 @@ PACKET_HANDLER(ePacketType::MISSION_PICKUP_COLLECTED, Packets::Blips::MissionPic
 		return;
 
 	CMissionPickupSync::HandlePacket(*pMissionPickupCollected);
+}
+
+PACKET_HANDLER(ePacketType::MISSION_FIRES, Packets::Blips::MissionFires* pMissionFires)
+{
+	if (CLocalPlayer::m_bIsHost)
+		return;
+
+	CMissionFireSync::HandlePacket(*pMissionFires);
+}
+
+PACKET_HANDLER(ePacketType::MISSION_FIRE_OUT, Packets::Blips::MissionFireOut* pMissionFireOut)
+{
+	if (!CLocalPlayer::m_bIsHost)
+		return;
+
+	CMissionFireSync::HandlePacket(*pMissionFireOut);
 }

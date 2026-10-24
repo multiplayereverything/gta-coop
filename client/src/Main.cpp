@@ -39,6 +39,7 @@
 #include "CCoopPerf.h"
 #include "CMissionMarkerSync.h"
 #include "CMissionPickupSync.h"
+#include "CMissionFireSync.h"
 
 unsigned int lastOnFootSyncTickRate = 0;
 unsigned int lastDriverSyncTickRate = 0;
@@ -150,6 +151,7 @@ public:
                 CCommandTeleportPlayersToHostSafely::ProcessPendingTeleport();
                 CMissionPartnerVehicles::Process();
                 CMissionPickupSync::Process();
+                CMissionFireSync::Process();
 
                 CPlayerPed* localPlayer = FindPlayerPed(0);
 

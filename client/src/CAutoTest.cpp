@@ -7,8 +7,10 @@
 #include "CCoopPerf.h"
 #include "CMissionMarkerSync.h"
 #include "CMissionPickupSync.h"
+#include "CMissionFireSync.h"
 #include <CMessages.h>
 #include <C3dMarkers.h>
+#include <CFireManager.h>
 #include <CPickups.h>
 #include <CCheckpoints.h>
 #include <CEntryExitManager.h>
@@ -626,7 +628,7 @@ void CAutoTest::WriteStatus(bool inGame)
            << ",\"mirroredMarkers\":" << CMissionMarkerSync::GetMirroredCount()
            << ",\"carJitter\":" << (CNetworkVehicleManager::ms_nJitterSamples ? 100.0 * CNetworkVehicleManager::ms_nJitterBackSteps / CNetworkVehicleManager::ms_nJitterSamples : 0.0)
            << ",\"carJitterSamples\":" << CNetworkVehicleManager::ms_nJitterSamples << ",\"carSnaps\":" << CNetworkVehicleManager::ms_nSnaps
-           << ",\"missionPickups\":" << CMissionPickupSync::GetCount()
+           << ",\"missionPickups\":" << CMissionPickupSync::GetCount() << ",\"missionFires\":" << CMissionFireSync::GetCount()
            << ",\"minigame\":" << (CTheScripts::bMiniGameInProgress ? "true" : "false")
            << ",\"coopUs\":{\"net\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::NET] << ",\"process\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PROCESS] << ",\"draw\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::DRAW] << ",\"autotest\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::AUTOTEST] << ",\"peds\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PEDS] << ",\"vehicles\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::VEHICLES] << ",\"tags\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::TAGS] << ",\"chatAndRest\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::CHAT] << ",\"playerList\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PLAYERLIST] << ",\"checkpoint\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::CHECKPOINT] << ",\"input\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::INPUT] << ",\"version\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::VERSION] << "}"
            << ",\"widescreen\":" << (TheCamera.m_bWideScreenOn ? "true" : "false")
@@ -961,6 +963,29 @@ void CAutoTest::Execute(const std::string& line)
         }
         else
             result = "not in a vehicle";
+    }
+    else if (verb == "fire")
+    {
+        // fire create <x> <y> <z>: a mission fire on a spot (start_script_fire); fire state: is it out;
+        // fire out <x> <y> <z>: put fires out there (like an extinguisher)
+        static int handle = 0;
+        std::string what;
+        in >> what;
+        float x = 0, y = 0, z = 0;
+        in >> x >> y >> z;
+        if (what == "create")
+        {
+            Command<Commands::START_SCRIPT_FIRE>(x, y, z, 0, 1, &handle);
+            result = "handle=" + std::to_string(handle);
+        }
+        else if (what == "out")
+            gFireManager.ExtinguishPoint(CVector(x, y, z), 4.0f);
+        else
+        {
+            int index = handle & 0xFFFF;
+            bool burning = handle && index < MAX_NUM_FIRES && gFireManager.m_aFires[index].m_nFlags.bActive;
+            result = std::string("burning=") + (burning ? "true" : "false");
+        }
     }
     else if (verb == "checkpoint")
     {

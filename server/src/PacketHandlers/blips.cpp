@@ -48,3 +48,20 @@ PACKET_HANDLER(ePacketType::MISSION_PICKUP_COLLECTED, Packets::Blips::MissionPic
         GetPacketFactory().Send(*pMissionPickupCollected, pHost);
     }
 }
+
+PACKET_HANDLER(ePacketType::MISSION_FIRES, Packets::Blips::MissionFires* pMissionFires, CNetworkPlayer* pNetworkPlayer)
+{
+    if (pNetworkPlayer->m_bIsHost)
+    {
+        GetPacketFactory().SendToAll(*pMissionFires, pNetworkPlayer);
+    }
+}
+
+PACKET_HANDLER(ePacketType::MISSION_FIRE_OUT, Packets::Blips::MissionFireOut* pMissionFireOut, CNetworkPlayer* pNetworkPlayer)
+{
+    CNetworkPlayer* pHost = CNetworkPlayerManager::GetHost();
+    if (pHost && pHost != pNetworkPlayer)
+    {
+        GetPacketFactory().Send(*pMissionFireOut, pHost);
+    }
+}

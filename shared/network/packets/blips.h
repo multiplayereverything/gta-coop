@@ -158,4 +158,55 @@ private:
         return true;
     }
 };
+// fires the host's current mission started at a spot (host -> partners, sent when the list changes)
+class MissionFires : public Packet
+{
+    DEFINE_PACKET_TYPE(MissionFires, ePacketType::MISSION_FIRES, ePacketChannel::SCRIPT);
+
+public:
+    static constexpr int MAX_FIRES = 16;
+
+    struct Fire
+    {
+        int32_t id = 0;  // the host's fire: array index | script reference << 16
+        CVector position{};
+        uint8_t strength = 0;
+        int8_t generations = 0;
+    };
+
+    uint8_t count = 0;
+    Fire fires[MAX_FIRES]{};
+
+private:
+    template <typename Stream>
+    bool Serialize(Stream& stream)
+    {
+        serialize_int(stream, count, 0, MAX_FIRES);
+        for (int i = 0; i < count; i++)
+        {
+            serialize_bits(stream, fires[i].id, 32);
+            serialize_vector(stream, fires[i].position);
+            serialize_bits(stream, fires[i].strength, 8);
+            serialize_bits(stream, fires[i].generations, 8);
+        }
+        return true;
+    }
+};
+
+// a partner put out its copy of a mission fire (partner -> host): the host's fire goes out too
+class MissionFireOut : public Packet
+{
+    DEFINE_PACKET_TYPE(MissionFireOut, ePacketType::MISSION_FIRE_OUT, ePacketChannel::SCRIPT);
+
+public:
+    int32_t id = 0;
+
+private:
+    template <typename Stream>
+    bool Serialize(Stream& stream)
+    {
+        serialize_bits(stream, id, 32);
+        return true;
+    }
+};
 }  // namespace Packets::Blips
