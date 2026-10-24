@@ -5,6 +5,7 @@
 #include "CMissionMarkerSync.h"
 #include "CMissionPickupSync.h"
 #include "CMissionFireSync.h"
+#include "CMissionTrainSync.h"
 
 PACKET_HANDLER(ePacketType::UPDATE_CHECKPOINT, Packets::Blips::UpdateCheckpoint* pUpdateCheckpoint)
 {
@@ -60,4 +61,12 @@ PACKET_HANDLER(ePacketType::MISSION_FIRE_OUT, Packets::Blips::MissionFireOut* pM
 		return;
 
 	CMissionFireSync::HandlePacket(*pMissionFireOut);
+}
+
+PACKET_HANDLER(ePacketType::MISSION_TRAINS, Packets::Blips::MissionTrains* pMissionTrains)
+{
+	if (CLocalPlayer::m_bIsHost)
+		return;
+
+	CMissionTrainSync::HandlePacket(*pMissionTrains);
 }

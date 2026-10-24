@@ -209,4 +209,53 @@ private:
         return true;
     }
 };
+// trains the host's current mission created (create_mission_train), with where they are and how fast they go
+class MissionTrains : public Packet
+{
+    DEFINE_PACKET_TYPE(MissionTrains, ePacketType::MISSION_TRAINS, ePacketChannel::SCRIPT);
+
+public:
+    static constexpr int MAX_TRAINS = 4;
+
+    struct Train
+    {
+        int32_t id = 0;  // the host numbers its mission trains
+        uint8_t type = 0;
+        bool clockwise = false;
+        int32_t node = -1;
+        int8_t track = -1;
+        CVector spawn{};     // where the mission created it (partners create theirs the same way)
+        CVector position{};  // engine now
+        float speed = 0;
+        float rail = 0;  // engine's distance along its track (what places a train exactly)
+        int8_t trackNow = 0;
+        int16_t nodeNow = 0;
+    };
+
+    uint8_t count = 0;
+    Train trains[MAX_TRAINS]{};
+
+private:
+    template <typename Stream>
+    bool Serialize(Stream& stream)
+    {
+        serialize_int(stream, count, 0, MAX_TRAINS);
+        for (int i = 0; i < count; i++)
+        {
+            Train& t = trains[i];
+            serialize_bits(stream, t.id, 32);
+            serialize_bits(stream, t.type, 8);
+            serialize_bool(stream, t.clockwise);
+            serialize_bits(stream, t.node, 32);
+            serialize_bits(stream, t.track, 8);
+            serialize_vector(stream, t.spawn);
+            serialize_vector(stream, t.position);
+            serialize_float(stream, t.speed);
+            serialize_float(stream, t.rail);
+            serialize_bits(stream, t.trackNow, 8);
+            serialize_bits(stream, t.nodeNow, 16);
+        }
+        return true;
+    }
+};
 }  // namespace Packets::Blips

@@ -8,6 +8,7 @@
 #include "CMissionMarkerSync.h"
 #include "CMissionPickupSync.h"
 #include "CMissionFireSync.h"
+#include "CMissionTrainSync.h"
 #include <CMessages.h>
 #include <C3dMarkers.h>
 #include <CFireManager.h>
@@ -630,6 +631,8 @@ void CAutoTest::WriteStatus(bool inGame)
            << ",\"carJitterSamples\":" << CNetworkVehicleManager::ms_nJitterSamples << ",\"carSnaps\":" << CNetworkVehicleManager::ms_nSnaps
            << ",\"towing\":" << [] { int n = 0; for (CNetworkVehicle* v : CNetworkVehicleManager::m_pVehicles) if (v->m_pVehicle && v->m_pVehicle->m_pTrailer && v->m_pVehicle->m_pTrailer->m_matrix && (v->m_pVehicle->m_pTrailer->GetPosition() - v->m_pVehicle->GetPosition()).Magnitude() < 20.0f) n++; return n; }()
            << ",\"missionPickups\":" << CMissionPickupSync::GetCount() << ",\"missionFires\":" << CMissionFireSync::GetCount()
+           << ",\"trainInfo\":\"" << CMissionTrainSync::Describe() << "\""
+           << ",\"trains\":" << CMissionTrainSync::GetCount() << ",\"trainOffset\":" << CMissionTrainSync::GetMaxOffset()
            << ",\"minigame\":" << (CTheScripts::bMiniGameInProgress ? "true" : "false")
            << ",\"coopUs\":{\"net\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::NET] << ",\"process\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PROCESS] << ",\"draw\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::DRAW] << ",\"autotest\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::AUTOTEST] << ",\"peds\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PEDS] << ",\"vehicles\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::VEHICLES] << ",\"tags\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::TAGS] << ",\"chatAndRest\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::CHAT] << ",\"playerList\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PLAYERLIST] << ",\"checkpoint\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::CHECKPOINT] << ",\"input\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::INPUT] << ",\"version\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::VERSION] << "}"
            << ",\"widescreen\":" << (TheCamera.m_bWideScreenOn ? "true" : "false")
@@ -1007,6 +1010,32 @@ void CAutoTest::Execute(const std::string& line)
         }
         else
             result = "not in a vehicle";
+    }
+    else if (verb == "train")
+    {
+        // train <x> <y> <z> <speed>: a mission train (create_mission_train type 9) set off at that speed;
+        // train delete: delete it (delete_mission_train)
+        static int train = -1;
+        std::string first;
+        in >> first;
+        if (first == "delete")
+        {
+            if (train != -1)
+                Command<Commands::DELETE_MISSION_TRAIN>(train);
+            train = -1;
+        }
+        else
+        {
+            float x = (float)atof(first.c_str()), y = 0, z = 0, speed = 0;
+            in >> y >> z >> speed;
+            for (int model : {449, 537, 538, 569, 570, 590})
+                Command<Commands::REQUEST_MODEL>(model);
+            Command<Commands::LOAD_ALL_MODELS_NOW>();
+            Command<Commands::CREATE_MISSION_TRAIN>(9, x, y, z, 1, &train);
+            if (train != -1)
+                Command<Commands::SET_TRAIN_CRUISE_SPEED>(train, speed);
+            result = "train=" + std::to_string(train);
+        }
     }
     else if (verb == "checkpoint")
     {

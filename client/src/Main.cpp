@@ -40,6 +40,7 @@
 #include "CMissionMarkerSync.h"
 #include "CMissionPickupSync.h"
 #include "CMissionFireSync.h"
+#include "CMissionTrainSync.h"
 
 unsigned int lastOnFootSyncTickRate = 0;
 unsigned int lastDriverSyncTickRate = 0;
@@ -152,6 +153,7 @@ public:
                 CMissionPartnerVehicles::Process();
                 CMissionPickupSync::Process();
                 CMissionFireSync::Process();
+                CMissionTrainSync::Process();
 
                 CPlayerPed* localPlayer = FindPlayerPed(0);
 

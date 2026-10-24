@@ -65,3 +65,11 @@ PACKET_HANDLER(ePacketType::MISSION_FIRE_OUT, Packets::Blips::MissionFireOut* pM
         GetPacketFactory().Send(*pMissionFireOut, pHost);
     }
 }
+
+PACKET_HANDLER(ePacketType::MISSION_TRAINS, Packets::Blips::MissionTrains* pMissionTrains, CNetworkPlayer* pNetworkPlayer)
+{
+    if (pNetworkPlayer->m_bIsHost)
+    {
+        GetPacketFactory().SendToAll(*pMissionTrains, pNetworkPlayer);
+    }
+}
