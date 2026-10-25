@@ -109,7 +109,8 @@ static void __cdecl CWorld__Add_Hook(CEntity* entity)
         CObject* object = (CObject*)entity;
         CRunningScript* script = COpCodeSync::GetLastProcessedScript();
         if (object->m_nObjectType == OBJECT_MISSION && script != nullptr && script->m_bIsMission &&
-            COpCodeSync::IsScriptSynced(script) && CNetworkObjectManager::GetObject(object) == nullptr)
+            (COpCodeSync::IsScriptSynced(script) || COpCodeSync::IsCurrentScriptUnportedMission()) &&
+            CNetworkObjectManager::GetObject(object) == nullptr)  // host-run missions too: partners see their objects (and blips on them)
         {
             CNetworkObject::CreateHosted(object);
         }

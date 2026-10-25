@@ -105,6 +105,7 @@ static BOOL WINAPI ShowWindow_Hidden(HWND hWnd, int nCmdShow)
     SetWindowPos(hWnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
     return result;
 }
+static void __cdecl UnderWaterEffect_Hidden() {}
 static BOOL WINAPI SetForegroundWindow_Hidden(HWND) { return TRUE; }
 static HWND WINAPI SetFocus_Hidden(HWND) { return GetFocus(); }
 static HWND WINAPI SetActiveWindow_Hidden(HWND) { return GetActiveWindow(); }
@@ -215,6 +216,9 @@ void CAutoTest::Init()
 
     if (strstr(cmd, "-autohide"))
     {
+        // hidden test games are minimized: the underwater screen effect (CPostEffects, 0x7039C0) reads the screen picture
+        // a minimized window does not have and crashed whenever a test player was in water. Test runs only.
+        patch::RedirectCall(0x70529C, UnderWaterEffect_Hidden);  // call CPostEffects::UnderWaterRipple (E8 -> 0x7039C0, checked)
         PatchGameImport("CreateWindowExA", CreateWindowExA_Hidden);
         PatchGameImport("ShowWindow", ShowWindow_Hidden);
         PatchGameImport("SetForegroundWindow", SetForegroundWindow_Hidden);
