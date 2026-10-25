@@ -1,4 +1,4 @@
-#include "network/packets/vehicles.h"
+﻿#include "network/packets/vehicles.h"
 #include "network/packet_types.h"
 #include "stdafx.h"
 #include <CCarEnterExit.h>
@@ -159,6 +159,7 @@ PACKET_HANDLER(ePacketType::VEHICLE_DRIVER_UPDATE, Packets::Vehicles::VehicleDri
         if (pTrailer && pTrailer->IsVTableValid() && !pTrailer->m_pTractor && pTrailer->m_nVehicleSubType == VEHICLE_TRAILER)
             pTrailer->SetTowLink(pVehicle, true);
     }
+    pNetworkVehicle->m_nDriverRadio = pVehicleDriverUpdate->radioStation;
     pNetworkVehicle->m_playerDriverSnapshot = *pVehicleDriverUpdate;
 }
 

@@ -1,7 +1,10 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "CNetworkVehicle.h"
 #include <CKeySync.h>
 #include "CNetworkVehicleManager.h"
+#include "CAutoTest.h"
+#include <CAERadioTrackManager.h>
+#include <CAudioEngine.h>
 
 CNetworkVehicle* CNetworkVehicleManager::GetVehicle(vehicleid_t vehicleid)
 {
@@ -93,6 +96,8 @@ void CNetworkVehicleManager::UpdateDriver(CVehicle* pVehicle)
 		}
 
 		vehicleDriverUpdate.locked = pVehicle->m_eDoorLock;
+		if (AudioEngine.IsRadioOn())  // what the driver hears, for the passengers
+			vehicleDriverUpdate.radioStation = (uint8_t)AudioEngine.GetCurrentRadioStationID();
 
 		if (pVehicle->m_pTrailer)
 		{
@@ -277,4 +282,53 @@ void CNetworkVehicleManager::ProcessSmoothing()
         }
         networkVehicle->m_vecLastFramePos = vehicle->GetPosition();
     }
+}
+
+void CNetworkVehicleManager::SetOwnCarRadio(CVehicle* vehicle, int station)
+{
+    // the game's own retune (what the radio station script command does), and the car remembers it
+    vehicle->m_vehicleAudio.m_settings.m_nRadioID = (eRadioID)station;
+    AudioEngine.RetuneRadio((char)station);
+}
+
+void CNetworkVehicleManager::ProcessPassengerRadio()
+{
+    static uint32_t lastCheck = 0, lastRetune = 0;
+    static int triedStation = 0, tries = 0;  // at most 3 tries per station: no endless tuning noise
+    uint32_t now = GetTickCount();
+    if (now - lastCheck < 1000)
+        return;
+    lastCheck = now;
+
+    CPlayerPed* me = FindPlayerPed(0);
+    CVehicle* vehicle = me && me->m_nPedFlags.bInVehicle ? me->m_pVehicle : nullptr;
+    if (!vehicle || !vehicle->m_pDriver || vehicle->m_pDriver == me || !CNetworkPlayerManager::GetPlayer(vehicle->m_pDriver))
+        return;
+    CNetworkVehicle* networkVehicle = GetVehicle(vehicle);
+    if (!networkVehicle || now - networkVehicle->m_nSyncedAt > 2000)
+        return;
+    int station = networkVehicle->m_nDriverRadio;
+    static int logged = 0;
+    if (logged++ < 15)
+        CAutoTest::Event("radio_check", "\"driver\":" + std::to_string(station) + ",\"on\":" + std::to_string(AudioEngine.IsRadioOn()) + ",\"mine\":" + std::to_string((int)AudioEngine.GetCurrentRadioStationID()));
+    if (station < RADIO_PLAYBACK_FM || station > RADIO_USER_TRACKS || (AudioEngine.IsRadioOn() && AudioEngine.GetCurrentRadioStationID() == station) ||
+        now - lastRetune < 6000 || AudioEngine.IsRadioRetuneInProgress())  // never cut a retune short
+        return;
+    if (station != triedStation)
+    {
+        triedStation = station;
+        tries = 0;
+    }
+    if (++tries > 3)
+        return;
+    lastRetune = now;
+    if (!AudioEngine.IsRadioOn())  // a passenger in another player's car had no radio at all
+    {
+        vehicle->m_vehicleAudio.m_settings.m_nRadioID = (eRadioID)station;
+        AudioEngine.StartRadio(station, 0);
+        AudioEngine.RetuneRadio((char)station);  // starting alone left it silent at the start of a ride
+    }
+    else
+        SetOwnCarRadio(vehicle, station);
+    CAutoTest::Event("radio_follows_driver", "\"station\":" + std::to_string(station));
 }

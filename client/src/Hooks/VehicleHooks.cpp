@@ -1,4 +1,4 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "VehicleHooks.h"
 #include "CKeySync.h"
 #include "CAimSync.h"

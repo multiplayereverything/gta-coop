@@ -33,6 +33,8 @@ static std::unordered_set<std::string> ms_known;  // asked for already (or faile
 static std::string ms_downloading;             // the song coming in now
 static playerid_t ms_downloadOwner{};
 static uint32_t ms_downloadSize = 0, ms_downloadReceived = 0, ms_lastChunkAt = 0;
+static int ms_nRequestTries = 0;          // a request can get lost (e.g. sent the moment a player joins): asked again
+static uint32_t ms_nAuthenticatedAt = 0;
 static std::ofstream ms_downloadFile;
 static std::deque<SUpload*> ms_uploads;
 static uint32_t ms_nLastListAt = 0;
@@ -107,6 +109,16 @@ static void FinishDownload(bool ok)
     ms_downloading.clear();
 }
 
+static void SendRequest()
+{
+    Packets::Blips::UserTrackRequest request{};
+    request.owner = ms_downloadOwner;
+    strcpy_s(request.name, ms_downloading.c_str());
+    GetPacketFactory().Send(request);
+    ms_nRequestTries++;
+    ms_lastChunkAt = GetTickCount();
+}
+
 static void StartNextDownload()
 {
     std::error_code ec;
@@ -127,10 +139,8 @@ static void StartNextDownload()
         ms_downloadReceived = 0;
         ms_lastChunkAt = GetTickCount();
 
-        Packets::Blips::UserTrackRequest request{};
-        request.owner = next.owner;
-        strcpy_s(request.name, next.name.c_str());
-        GetPacketFactory().Send(request);
+        ms_nRequestTries = 0;
+        SendRequest();
         CAutoTest::Event("user_track_requested", "\"size\":" + std::to_string(next.size));
     }
 }
@@ -138,6 +148,13 @@ static void StartNextDownload()
 void CUserTrackSync::Process()
 {
     if (!CNetwork::m_bAuthenticated || CNetworkPlayerManager::m_pPlayers.empty())
+    {
+        ms_nAuthenticatedAt = 0;
+        return;
+    }
+    if (ms_nAuthenticatedAt == 0)
+        ms_nAuthenticatedAt = GetTickCount();
+    if (GetTickCount() - ms_nAuthenticatedAt < 5000)  // just joined: the server may not route our packets yet
         return;
 
     // tell the others what this game has (also reaches players who joined later)
@@ -147,7 +164,9 @@ void CUserTrackSync::Process()
         SendList();
     }
 
-    // a download that stopped (owner left, lost): drop it and go on with the next
+    // nothing came for a request: ask again (3 times), then a download that stopped (owner left) is dropped
+    if (!ms_downloading.empty() && ms_downloadReceived == 0 && GetTickCount() - ms_lastChunkAt > 5000 && ms_nRequestTries < 3)
+        SendRequest();
     if (!ms_downloading.empty() && GetTickCount() - ms_lastChunkAt > 30000)
     {
         CAutoTest::Event("user_track_timeout", "\"got\":" + std::to_string(ms_downloadReceived) + ",\"size\":" + std::to_string(ms_downloadSize));
@@ -205,6 +224,11 @@ void CUserTrackSync::HandlePacket(const Packets::Blips::UserTrackRequest& packet
     fs::path path = fs::u8path(Folder()) / fs::u8path(name);
     if (!IsSongName(name) || !fs::is_regular_file(path, ec) || ms_uploads.size() >= 8)
         return;
+    for (SUpload* upload : ms_uploads)
+    {
+        if (upload->to == packet.senderPlayerid.value && upload->name == name)
+            return;  // asked again while it is already on its way
+    }
     uint64_t size = fs::file_size(path, ec);
     if (ec || size == 0 || size > MAX_SONG_SIZE)
         return;

@@ -169,6 +169,7 @@ public:
     float planeGearState{};
     eDoorLock locked{};
     vehicleid_t trailerId{};  // trailer hooked on (invalid = none): partners hook it on locally
+    uint8_t radioStation = 0;  // station the driver hears (eRadioID, 0 = radio off): passengers hear the same
 
 private:
     template <typename Stream>
@@ -265,6 +266,7 @@ private:
         {
             serialize_vehicleid(stream, trailerId);
         }
+        serialize_int(stream, radioStation, 0, 13);
 
         return true;
     }

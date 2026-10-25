@@ -16,6 +16,7 @@ public:
 	CVector m_vecSyncedSpeed{};
 	uint32_t m_nSyncedAt = 0;
 	CVector m_vecLastFramePos{};
+	uint8_t m_nDriverRadio = 0;  // station the other player driving it hears (0 = radio off)
 	CDamageManager m_oldDamageState{};
 
 	~CNetworkVehicle();

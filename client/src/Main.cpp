@@ -253,6 +253,7 @@ public:
 
                 { CCoopPerf::Scope p(CCoopPerf::PEDS); CNetworkPedManager::Process(); }
                 CNetworkVehicleManager::ProcessSmoothing();
+                CNetworkVehicleManager::ProcessPassengerRadio();
 
                 static uint32_t crashHotkeyPressedAt = 0;
 

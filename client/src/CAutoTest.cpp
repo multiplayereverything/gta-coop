@@ -13,6 +13,9 @@
 #include "CSaveSync.h"
 #include "CUserTrackSync.h"
 #include <CStats.h>
+#include <CTheZones.h>
+#include <CAERadioTrackManager.h>
+#include <CAudioEngine.h>
 #include <CGenericGameStorage.h>
 #include <CClothes.h>
 #include <CMessages.h>
@@ -694,6 +697,8 @@ void CAutoTest::WriteStatus(bool inGame)
            << ",\"trains\":" << CMissionTrainSync::GetCount() << ",\"trainOffset\":" << CMissionTrainSync::GetMaxOffset()
            << ",\"userDir\":\"" << JsonEscape((const char*)0xC92368) << "\",\"savePrefix\":\"" << JsonEscape((const char*)0xC16F18) << "\""
            << ",\"userTracksReceived\":" << CUserTrackSync::GetReceivedCount()
+           << ",\"radioStation\":" << (AudioEngine.IsRadioOn() ? (int)AudioEngine.GetCurrentRadioStationID() : 0)
+           << ",\"zoneInfo\":\"" << [] { CPlayerPed* me = FindPlayerPed(0); CVector pos = me ? me->GetPosition() : CVector(); CZoneInfo* info = CTheZones::GetZoneInfo(&pos, nullptr); std::ostringstream o; o << std::hex << (uintptr_t)info << std::dec << " count " << *(int16_t*)0xBA1DE8 << " gangs"; for (int g = 0; info && g < 10; g++) o << " " << (int)(uint8_t)info->m_nGangDensity[g]; return o.str(); }() << "\""
            << ",\"minigame\":" << (CTheScripts::bMiniGameInProgress ? "true" : "false")
            << ",\"coopUs\":{\"net\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::NET] << ",\"process\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PROCESS] << ",\"draw\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::DRAW] << ",\"autotest\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::AUTOTEST] << ",\"peds\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PEDS] << ",\"vehicles\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::VEHICLES] << ",\"tags\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::TAGS] << ",\"chatAndRest\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::CHAT] << ",\"playerList\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PLAYERLIST] << ",\"checkpoint\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::CHECKPOINT] << ",\"input\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::INPUT] << ",\"version\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::VERSION] << "}"
            << ",\"widescreen\":" << (TheCamera.m_bWideScreenOn ? "true" : "false")
@@ -1145,6 +1150,16 @@ void CAutoTest::Execute(const std::string& line)
         }
         else
             result = "slot not valid";
+    }
+    else if (verb == "radio")
+    {
+        // radio <1-12>: retune the car this player is in (eRadioID; 12 = user tracks)
+        int station = 1;
+        in >> station;
+        if (player->m_nPedFlags.bInVehicle && player->m_pVehicle)
+            CNetworkVehicleManager::SetOwnCarRadio(player->m_pVehicle, station);
+        else
+            result = "not in a vehicle";
     }
     else if (verb == "checkpoint")
     {

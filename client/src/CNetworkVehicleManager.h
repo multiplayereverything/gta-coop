@@ -27,5 +27,8 @@ public:
     static inline int ms_nJitterBackSteps = 0;
     static inline int ms_nSnaps = 0;
     static void ProcessSmoothing();
+    // a passenger hears the station the driver (another player) hears
+    static void ProcessPassengerRadio();
+    static void SetOwnCarRadio(CVehicle* vehicle, int station);  // retune the car this player is in
 };
 
