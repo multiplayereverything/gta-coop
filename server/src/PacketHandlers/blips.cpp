@@ -114,3 +114,11 @@ PACKET_HANDLER(ePacketType::USER_TRACK_CHUNK, Packets::Blips::UserTrackChunk* pU
         GetPacketFactory().Send(*pUserTrackChunk, pTarget);
     }
 }
+
+PACKET_HANDLER(ePacketType::GANG_ZONES, Packets::Blips::GangZones* pGangZones, CNetworkPlayer* pNetworkPlayer)
+{
+    if (pNetworkPlayer->m_bIsHost)
+    {
+        GetPacketFactory().SendToAll(*pGangZones, pNetworkPlayer);
+    }
+}

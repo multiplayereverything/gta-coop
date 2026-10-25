@@ -385,4 +385,25 @@ private:
         return true;
     }
 };
+// gang territories: per zone the gang strengths, map colour and flags of the host's game (host -> partners)
+class GangZones : public Packet
+{
+    DEFINE_PACKET_TYPE(GangZones, ePacketType::GANG_ZONES, ePacketChannel::SCRIPT);
+
+public:
+    static constexpr int BYTES_PER_ZONE = 15;  // 10 gang densities, RGBA colour, flags
+    static constexpr int MAX_BYTES = 9000;
+
+    uint16_t count = 0;
+    uint8_t data[MAX_BYTES]{};
+
+private:
+    template <typename Stream>
+    bool Serialize(Stream& stream)
+    {
+        serialize_int(stream, count, 0, MAX_BYTES / BYTES_PER_ZONE);
+        serialize_bytes(stream, data, count * BYTES_PER_ZONE);
+        return true;
+    }
+};
 }  // namespace Packets::Blips

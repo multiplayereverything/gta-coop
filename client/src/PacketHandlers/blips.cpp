@@ -8,6 +8,7 @@
 #include "CMissionTrainSync.h"
 #include "CSaveSync.h"
 #include "CUserTrackSync.h"
+#include "CGangZoneSync.h"
 
 PACKET_HANDLER(ePacketType::UPDATE_CHECKPOINT, Packets::Blips::UpdateCheckpoint* pUpdateCheckpoint)
 {
@@ -102,4 +103,12 @@ PACKET_HANDLER(ePacketType::USER_TRACK_REQUEST, Packets::Blips::UserTrackRequest
 PACKET_HANDLER(ePacketType::USER_TRACK_CHUNK, Packets::Blips::UserTrackChunk* pUserTrackChunk)
 {
 	CUserTrackSync::HandlePacket(*pUserTrackChunk);
+}
+
+PACKET_HANDLER(ePacketType::GANG_ZONES, Packets::Blips::GangZones* pGangZones)
+{
+	if (CLocalPlayer::m_bIsHost)
+		return;
+
+	CGangZoneSync::HandlePacket(*pGangZones);
 }

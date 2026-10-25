@@ -43,6 +43,7 @@
 #include "CMissionTrainSync.h"
 #include "CSaveSync.h"
 #include "CUserTrackSync.h"
+#include "CGangZoneSync.h"
 #include "CCrashLog.h"
 
 unsigned int lastOnFootSyncTickRate = 0;
@@ -254,6 +255,7 @@ public:
                 { CCoopPerf::Scope p(CCoopPerf::PEDS); CNetworkPedManager::Process(); }
                 CNetworkVehicleManager::ProcessSmoothing();
                 CNetworkVehicleManager::ProcessPassengerRadio();
+                CGangZoneSync::Process();
 
                 static uint32_t crashHotkeyPressedAt = 0;
 

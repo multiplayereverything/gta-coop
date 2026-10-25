@@ -1161,6 +1161,18 @@ void CAutoTest::Execute(const std::string& line)
         else
             result = "not in a vehicle";
     }
+    else if (verb == "gangzone")
+    {
+        // gangzone <gang 0-9> <strength>: the gang's strength in the zone the player stands in (a gang war's result)
+        int gang = 0, strength = 0;
+        in >> gang >> strength;
+        CVector pos = player->GetPosition();
+        CZoneInfo* info = CTheZones::GetZoneInfo(&pos, nullptr);
+        if (info && gang >= 0 && gang < 10)
+            info->m_nGangDensity[gang] = (char)strength;
+        else
+            result = "no zone";
+    }
     else if (verb == "checkpoint")
     {
         // checkpoint create <x> <y> <z> | checkpoint delete: a script race checkpoint (create_checkpoint 06D5)
