@@ -493,18 +493,16 @@ LONG __stdcall CCrashLog::ExceptionHandler(_EXCEPTION_POINTERS* exceptionInfo) {
         ms_bSuccessSavedLog = true;
     }
 
-    HMODULE instance = GetModuleHandle("CoopAndreasSA.dll");
-    if (instance)
+    // no crash window (players asked): the log above is all that's needed. The report to the CoopAndreas devs
+    // (report-crashlogs in coopandreas.ini) still goes out (given 4 s at most), then the game closes quietly -
+    // without handing the crash on to CrashInfo.SA.asi / Windows, which would open their own windows.
+    std::string report = CCrashLog::ms_szCrashMessage;
+    CCrashReporter::PostCrashLog(report);
+    if (CCrashReporter::ms_postThread.joinable())
     {
-        DialogBoxParam(instance, MAKEINTRESOURCE(IDD_CRASHREPORT), 0, DialogProc, 0);
+        WaitForSingleObject(CCrashReporter::ms_postThread.native_handle(), 4000);
+        CCrashReporter::ms_postThread.detach();
     }
-
-    if (ms_lpPreviousFilter)
-    {
-        return ms_lpPreviousFilter(exceptionInfo);
-    }
-    else
-    {
-        return 0;
-    }
+    TerminateProcess(GetCurrentProcess(), 0xC0DE);
+    return EXCEPTION_EXECUTE_HANDLER;
 }

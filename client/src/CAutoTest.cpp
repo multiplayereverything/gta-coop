@@ -1042,6 +1042,11 @@ void CAutoTest::Execute(const std::string& line)
             result = "train=" + std::to_string(train);
         }
     }
+    else if (verb == "crash")
+    {
+        // crash: a deliberate access violation (checks the crash handling: log written, no window, game closes)
+        *(volatile int*)nullptr = 0xDEAD;
+    }
     else if (verb == "checkpoint")
     {
         // checkpoint create <x> <y> <z> | checkpoint delete: a script race checkpoint (create_checkpoint 06D5)
