@@ -58,6 +58,9 @@ DWORD WINAPI CNetwork::InitAsync(LPVOID)
             m_bConnected = true;
             m_bAuthenticated = false;
             m_bHandshakePending = true;
+            // same as the server: ride out up to ~30 s of silence (wifi drop, router hiccup). ENet's default gave
+            // up after ~5 s and the player was out of the session for good (testing/chaos-test.ps1, 10 s outage)
+            enet_peer_timeout(m_pPeer, 0, 30000, 60000);
 
             CChat::AddMessage("{63c7e8}[Network] {78d99a}Successfully {cecedb}connected to the server.");
         }

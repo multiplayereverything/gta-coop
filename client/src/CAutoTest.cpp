@@ -590,11 +590,101 @@ void CAutoTest::ProcessPad()
     CPad* pad = CPad::GetPad(0);
     if ((int)(ms_nPressUntil - GetTickCount()) > 0)
     {
-        if (signed short* b = PadButton(pad->NewState, ms_pressButton))
-            *b = 255;
+        // several at once with '+' (press fwd+cross 3000: sprint); fwd/walkfwd/back/turnl/turnr are the left stick
+        std::stringstream names(ms_pressButton);
+        std::string name;
+        while (std::getline(names, name, '+'))
+        {
+            if (name == "fwd") pad->NewState.LeftStickY = -128;
+            else if (name == "walkfwd") pad->NewState.LeftStickY = -40;
+            else if (name == "back") pad->NewState.LeftStickY = 128;
+            else if (name == "turnl") pad->NewState.LeftStickX = -128;
+            else if (name == "turnr") pad->NewState.LeftStickX = 128;
+            else if (signed short* b = PadButton(pad->NewState, name))
+                *b = 255;
+        }
     }
     else
         ms_pressButton.clear();
+}
+
+// Animation probe for coop-anything's animcheck (toolkit-coop-anything/tools/animcheck, format in its FORMAT.md):
+// every player as this game shows it - the local CJ and each other player's CJ - 20 times a second, so animcheck
+// can compare a player's own body with how the others see it (sliding, T-pose, floating, wrong animation/pose).
+// "animprobe on" starts autotest/<dir>/anim.probe.jsonl, "animprobe off" stops it.
+static bool ms_bAnimProbe = false;
+
+static void WriteProbeActor(std::ostringstream& o, CPed* ped, uint32_t ref)
+{
+    static const std::pair<const char*, unsigned> bones[] = {
+        {"pelvis", 2}, {"spine", 3}, {"neck", 5}, {"head", 8},
+        {"upperarm_r", 22}, {"forearm_r", 23}, {"hand_r", 25}, {"upperarm_l", 32}, {"forearm_l", 33}, {"hand_l", 35},
+        {"calf_l", 42}, {"foot_l", 44}, {"calf_r", 52}, {"foot_r", 54}};
+    CVector p = ped->GetPosition();
+    bool inCar = ped->m_nPedFlags.bInVehicle && ped->m_pVehicle;
+    bool dead = ped->m_fHealth <= 0.0f || ped->m_ePedState == PEDSTATE_DIE || ped->m_ePedState == PEDSTATE_DEAD;
+    // hidden (cutscene) or seated in a car: animcheck skips the body checks, position is still compared
+    bool valid = ped->m_pRwClump && ped->m_bIsVisible && !inCar;
+    o << "{\"ref\":" << ref << ",\"player\":true,\"pos\":[" << p.x << "," << p.y << "," << p.z << "],\"rot\":[0,0,"
+      << ped->GetHeading() << "],\"cell\":" << (int)ped->m_nAreaCode << ",\"dead\":" << (dead ? "true" : "false")
+      << ",\"valid3d\":" << (valid ? "true" : "false") << ",\"weapon\":{\"out\":"
+      << (ped->m_aWeapons[ped->m_nActiveWeaponSlot].m_eWeaponType != WEAPON_UNARMED ? "true" : "false")
+      << ",\"form\":" << (int)ped->m_aWeapons[ped->m_nActiveWeaponSlot].m_eWeaponType << "}";
+    if (ped->m_pRwClump)
+    {
+        // animation ids below 191 are the shared ped/move table (plugin-sdk ePedAnims.h), others are "group:id"
+        o << ",\"anim\":{\"seqs\":[";
+        bool first = true;
+        for (CAnimBlendAssociation* a = RpAnimBlendClumpGetFirstAssociation(ped->m_pRwClump); a;
+             a = RpAnimBlendGetNextAssociation(a))
+        {
+            if (a->m_fBlendAmount <= 0.01f)
+                continue;
+            o << (first ? "" : ",") << "{\"slot\":" << ((a->m_nFlags & 0x10) ? 1 : 0) << ",\"group\":";
+            if (a->m_nAnimId >= 0 && a->m_nAnimId < 191)
+                o << a->m_nAnimId;
+            else
+                o << "\"" << a->m_nAnimGroup << ":" << a->m_nAnimId << "\"";
+            o << ",\"state\":1,\"weight\":" << a->m_fBlendAmount << "}";
+            first = false;
+        }
+        o << "]},\"bones\":{";
+        first = true;
+        for (auto& [name, id] : bones)
+        {
+            RwV3d b{};
+            ped->GetBonePosition(b, id, false);
+            o << (first ? "" : ",") << "\"" << name << "\":[" << b.x << "," << b.y << "," << b.z << "]";
+            first = false;
+        }
+        o << "}";
+    }
+    o << "}";
+}
+
+static void WriteAnimProbe(const fs::path& dir)
+{
+    static uint32_t last = 0;
+    uint32_t now = GetTickCount();  // one clock for every game on this PC (and the status tick), so animcheck lines them up
+    if (!ms_bAnimProbe || now - last < 50)
+        return;
+    last = now;
+    CPlayerPed* me = FindPlayerPed(0);
+    if (!me || !CNetwork::m_bAuthenticated)
+        return;
+    std::ostringstream o;
+    o << std::fixed << std::setprecision(3) << "{\"machine\":\"" << dir.filename().string() << "\",\"t_ms\":" << now
+      << ",\"rx_ms\":" << now << ",\"actors\":[";
+    WriteProbeActor(o, me, CNetworkPlayerManager::m_localPlayerId.value());
+    for (CNetworkPlayer* np : CNetworkPlayerManager::m_pPlayers)
+        if (np->m_pPed && np->m_pPed->m_matrix)
+        {
+            o << ",";
+            WriteProbeActor(o, np->m_pPed, np->m_playerId.value());
+        }
+    o << "]}\n";
+    std::ofstream f(dir / "anim.probe.jsonl", std::ios::app);
+    f << o.str();
 }
 
 void CAutoTest::ProcessGame()
@@ -626,6 +716,7 @@ void CAutoTest::ProcessGame()
     DetectMission();
     ExecuteCommands();
     WriteStatus(true);
+    WriteAnimProbe(ms_dir);
 }
 
 void CAutoTest::OnChatMessage(const char* name, const wchar_t* message)
@@ -1122,6 +1213,12 @@ void CAutoTest::Execute(const std::string& line)
             result = "train=" + std::to_string(train);
         }
     }
+    else if (verb == "animprobe")
+    {
+        std::string on;
+        in >> on;
+        ms_bAnimProbe = on != "off";
+    }
     else if (verb == "crash")
     {
         // crash: a deliberate access violation (checks the crash handling: log written, no window, game closes)
@@ -1285,12 +1382,18 @@ void CAutoTest::Execute(const std::string& line)
     }
     else if (verb == "press")
     {
-        // press <cross|triangle|square|circle|up|down|left|right|r1|l1> [ms=200]: shop menus, entering cars
+        // press <cross|triangle|square|circle|up|down|left|right|r1|l1|r3|fwd|walkfwd|back|turnl|turnr>[+more] [ms=200]
         std::string button;
         int ms = 200;
         in >> button >> ms;
         CControllerState probe{};
-        if (!PadButton(probe, button))
+        bool known = !button.empty();
+        std::stringstream names(button);
+        for (std::string name; std::getline(names, name, '+');)
+            if (name != "fwd" && name != "walkfwd" && name != "back" && name != "turnl" && name != "turnr" &&
+                !PadButton(probe, name))
+                known = false;
+        if (!known)
             result = "unknown button";
         else
         {
