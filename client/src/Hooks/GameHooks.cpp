@@ -186,6 +186,13 @@ void GameHooks::InjectHooks()
 
     patch::RedirectCall(0x7424CB, CWeapon__FireSniper_Hook);
 
+    // collision model pool: the game with these mods starts at ~9980 of 10150 and city trips, deaths and missions
+    // add ~10-70 each (streaming); after ~10 min of busy play CColModel's new returned null and the game crashed
+    // (CPedModelInfo::CreateHitColModelSkinned -> CColModel::AllocateData on null). Raised in CPools::Initialise's
+    // "push 10150" before the pools exist, only if no limit adjuster changed it already.
+    if (*(uint8_t*)0x551106 == 0x68 && patch::GetUInt(0x551107) == 10150 && !CPools::ms_pColModelPool)
+        patch::SetUInt(0x551107, 20000);
+
 #ifdef DEBUG
     /*patch::ReplaceFunction(0x571980, CPCKeyboard__GetKeyDown_Hook);
     patch::ReplaceFunction(0x571970, CPCKeyboard__GetJustKeyDown_Hook);*/
