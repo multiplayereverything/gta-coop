@@ -823,6 +823,7 @@ void CAutoTest::WriteStatus(bool inGame)
             if (player && player->m_matrix)
                 js << ",\"distance\":" << (p - player->m_matrix->pos).Magnitude();
             js << ",\"inVehicle\":" << (np->m_pPed->m_nPedFlags.bInVehicle ? "true" : "false");
+            js << ",\"health\":" << np->m_pPed->m_fHealth << ",\"pedState\":" << (int)np->m_pPed->m_ePedState;
         }
         js << "}";
         first = false;
@@ -957,7 +958,16 @@ void CAutoTest::Execute(const std::string& line)
     }
     else if (verb == "kill")
     {
-        player->m_fHealth = 0.0f;
+        // kill: a deadly hit through the game's damage event (CWeapon::GenerateDamageEvent, like a gunshot; the
+        // cutscene protection blocks it). kill hard: only zeroes the health - test-only, in a scripted scene the
+        // player then never dies or respawns (walks around with 0 health)
+        std::string how;
+        in >> how;
+        if (how == "hard")
+            player->m_fHealth = 0.0f;
+        else
+            plugin::Call<0x73A530, CPed*, CEntity*, eWeaponType, int, ePedPieceTypes, int>(
+                player, nullptr, WEAPON_PISTOL, 1000, (ePedPieceTypes)3 /* torso */, 0);
     }
     else if (verb == "wanted")
     {
