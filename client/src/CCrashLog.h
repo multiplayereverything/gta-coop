@@ -11,5 +11,7 @@ public:
 	static inline bool ms_bSuccessSavedLog = false;
 	static inline LPTOP_LEVEL_EXCEPTION_FILTER ms_lpPreviousFilter;
 	static LONG __stdcall ExceptionHandler(_EXCEPTION_POINTERS* exceptionInfo);
+	// other mods (modloader plugins) install their own crash handler after ours: take it back now and then
+	static void KeepHandler();
 };
 

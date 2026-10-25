@@ -506,3 +506,13 @@ LONG __stdcall CCrashLog::ExceptionHandler(_EXCEPTION_POINTERS* exceptionInfo) {
     TerminateProcess(GetCurrentProcess(), 0xC0DE);
     return EXCEPTION_EXECUTE_HANDLER;
 }
+void CCrashLog::KeepHandler()
+{
+    static uint32_t lastCheck = 0;
+    if (GetTickCount() - lastCheck < 2000)
+        return;
+    lastCheck = GetTickCount();
+    LPTOP_LEVEL_EXCEPTION_FILTER previous = SetUnhandledExceptionFilter(ExceptionHandler);
+    if (previous != ExceptionHandler)
+        ms_lpPreviousFilter = previous;
+}

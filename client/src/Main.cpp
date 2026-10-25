@@ -41,6 +41,7 @@
 #include "CMissionPickupSync.h"
 #include "CMissionFireSync.h"
 #include "CMissionTrainSync.h"
+#include "CCrashLog.h"
 
 unsigned int lastOnFootSyncTickRate = 0;
 unsigned int lastDriverSyncTickRate = 0;
@@ -91,6 +92,7 @@ public:
         Events::gameProcessEvent += []
         {
             CCoopPerf::Scope perf(CCoopPerf::PROCESS);
+            CCrashLog::KeepHandler();
             CNetworkAnimQueue::Process();
             CEntryExitTransitionSync::Process();
             CDiscordRPCMgr::Update();
