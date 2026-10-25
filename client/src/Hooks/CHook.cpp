@@ -18,6 +18,7 @@
 #include "CCutsceneSkipVote.h"
 #include "../CMissionMarkerSync.h"
 #include "../CMissionTrainSync.h"
+#include "../CSaveSync.h"
 
 void CHook::Init()
 {
@@ -41,4 +42,5 @@ void CHook::Init()
     CCutsceneSkipVote::InjectHooks();
     CMissionMarkerSync::InjectHooks();
     CMissionTrainSync::InjectHooks();
+    CSaveSync::InjectHooks();
 }

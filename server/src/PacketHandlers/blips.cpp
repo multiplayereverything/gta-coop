@@ -73,3 +73,20 @@ PACKET_HANDLER(ePacketType::MISSION_TRAINS, Packets::Blips::MissionTrains* pMiss
         GetPacketFactory().SendToAll(*pMissionTrains, pNetworkPlayer);
     }
 }
+
+PACKET_HANDLER(ePacketType::SAVE_FILE_CHUNK, Packets::Blips::SaveFileChunk* pSaveFileChunk, CNetworkPlayer* pNetworkPlayer)
+{
+    if (pNetworkPlayer->m_bIsHost)
+    {
+        GetPacketFactory().SendToAll(*pSaveFileChunk, pNetworkPlayer);
+    }
+}
+
+PACKET_HANDLER(ePacketType::SAVE_REQUEST, Packets::Blips::SaveRequest* pSaveRequest, CNetworkPlayer* pNetworkPlayer)
+{
+    CNetworkPlayer* pHost = CNetworkPlayerManager::GetHost();
+    if (pHost && pHost != pNetworkPlayer)
+    {
+        GetPacketFactory().Send(*pSaveRequest, pHost);
+    }
+}

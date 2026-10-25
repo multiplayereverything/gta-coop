@@ -10,6 +10,10 @@
 #include "CMissionPickupSync.h"
 #include "CMissionFireSync.h"
 #include "CMissionTrainSync.h"
+#include "CSaveSync.h"
+#include <CStats.h>
+#include <CGenericGameStorage.h>
+#include <CClothes.h>
 #include <CMessages.h>
 #include <C3dMarkers.h>
 #include <CFireManager.h>
@@ -24,6 +28,7 @@
 namespace fs = std::filesystem;
 
 static fs::path ms_dir;
+static int ms_nAutoLoadSlot = -1;  // -autoload <slot>
 static std::string ms_docsDir;  // test games' own Documents\GTA San Andreas User Files, see ApplyTestUserDir
 static char ms_ip[129] = "127.0.0.1";
 static unsigned short ms_port = Config::DEFAULT_PORT;
@@ -261,6 +266,8 @@ void CAutoTest::Init()
 
     if (const char* v = GetArg(cmd, "-autoip"))
         CopyArg(v, ms_ip, sizeof(ms_ip));
+    if (const char* v = GetArg(cmd, "-autoload"))
+        ms_nAutoLoadSlot = atoi(v);
     if (const char* v = GetArg(cmd, "-autoport"))
         ms_port = (unsigned short)atoi(v);
     if (const char* v = GetArg(cmd, "-autoname"))
@@ -529,6 +536,14 @@ void CAutoTest::ProcessMenu(CMenuManager* pMenu)
     strcpy_s(CNetwork::m_IpAddress, ms_ip);
     CNetwork::m_nPort = ms_port;
 
+    // -autoload <slot>: start by loading that saved game (as Load Game in the menu), otherwise a new game
+    if (ms_nAutoLoadSlot >= 0 && CGenericGameStorage::CheckSlotDataValid(ms_nAutoLoadSlot, false))
+    {
+        Event("menu_load_game", "\"slot\":" + std::to_string(ms_nAutoLoadSlot));
+        pMenu->DoSettingsBeforeStartingAGame();
+        pMenu->m_bWantToLoad = true;  // = m_bLoadingData: CGame::InitialiseWhenRestarting loads the slot
+        return;
+    }
     ms_commandLog.push_back("menu: starting new game");
     Event("menu_new_game");
     pMenu->DoSettingsBeforeStartingAGame();
@@ -1085,6 +1100,49 @@ void CAutoTest::Execute(const std::string& line)
     {
         // crash: a deliberate access violation (checks the crash handling: log written, no window, game closes)
         *(volatile int*)nullptr = 0xDEAD;
+    }
+    else if (verb == "save")
+    {
+        // save <slot 0-7>: what saving in a safehouse does (the host shares it, a partner asks the host to)
+        int slot = 7;
+        in >> slot;
+        CSaveSync::SaveFromCommand(slot);
+        result = CSaveSync::SlotPath(slot);
+    }
+    else if (verb == "lookfrom")
+    {
+        // lookfrom <slot>: what loading that save does to CJ's look; result = torso clothes and fat now
+        int slot = 7;
+        in >> slot;
+        CSaveSync::ApplyLookForSlot(slot);
+        CPlayerPed* ped = FindPlayerPed(0);
+        result = ped && ped->m_pPlayerData ? "torso=" + std::to_string(ped->m_pPlayerData->m_pPedClothesDesc->m_anModelKeys[0]) + " fat=" +
+                                                 std::to_string((int)CStats::GetStatValue(STAT_FAT))
+                                           : "no ped";
+    }
+    else if (verb == "fat")
+    {
+        // fat [0-1000]: change CJ's body (a look the save sync must keep per player); without a value: just tell
+        float value = 0;
+        if (in >> value)
+        {
+            CStats::SetStatValue(STAT_FAT, value);
+            CClothes::RebuildPlayer(FindPlayerPed(0), false);
+        }
+        result = "fat=" + std::to_string((int)CStats::GetStatValue(STAT_FAT));
+    }
+    else if (verb == "loadslot")
+    {
+        // loadslot <slot 0-7>: load that saved game (as "Load Game" in the menu does)
+        int slot = 7;
+        in >> slot;
+        if (CGenericGameStorage::CheckSlotDataValid(slot, false))
+        {
+            FrontEndMenuManager.m_bWantToLoad = true;
+            FrontEndMenuManager.m_bWantToRestart = true;
+        }
+        else
+            result = "slot not valid";
     }
     else if (verb == "checkpoint")
     {

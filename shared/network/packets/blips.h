@@ -258,4 +258,51 @@ private:
         return true;
     }
 };
+// a saved game (the host's file) in pieces: everyone stores it in the same slot (host -> partners)
+class SaveFileChunk : public Packet
+{
+    DEFINE_PACKET_TYPE(SaveFileChunk, ePacketType::SAVE_FILE_CHUNK, ePacketChannel::SCRIPT);
+
+public:
+    static constexpr int MAX_DATA = 8000;  // the packet buffers are 10 KB
+
+    uint32_t transferId = 0;
+    uint8_t slot = 0;
+    uint32_t totalSize = 0;
+    uint32_t crc = 0;
+    uint32_t offset = 0;
+    uint16_t length = 0;
+    uint8_t data[MAX_DATA]{};
+
+private:
+    template <typename Stream>
+    bool Serialize(Stream& stream)
+    {
+        serialize_bits(stream, transferId, 32);
+        serialize_bits(stream, slot, 8);
+        serialize_bits(stream, totalSize, 32);
+        serialize_bits(stream, crc, 32);
+        serialize_bits(stream, offset, 32);
+        serialize_int(stream, length, 0, MAX_DATA);
+        serialize_bytes(stream, data, length);
+        return true;
+    }
+};
+
+// a partner saved: asks the host to save that slot and share it (partner -> host)
+class SaveRequest : public Packet
+{
+    DEFINE_PACKET_TYPE(SaveRequest, ePacketType::SAVE_REQUEST, ePacketChannel::SCRIPT);
+
+public:
+    uint8_t slot = 0;
+
+private:
+    template <typename Stream>
+    bool Serialize(Stream& stream)
+    {
+        serialize_bits(stream, slot, 8);
+        return true;
+    }
+};
 }  // namespace Packets::Blips

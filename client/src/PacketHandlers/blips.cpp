@@ -6,6 +6,7 @@
 #include "CMissionPickupSync.h"
 #include "CMissionFireSync.h"
 #include "CMissionTrainSync.h"
+#include "CSaveSync.h"
 
 PACKET_HANDLER(ePacketType::UPDATE_CHECKPOINT, Packets::Blips::UpdateCheckpoint* pUpdateCheckpoint)
 {
@@ -69,4 +70,20 @@ PACKET_HANDLER(ePacketType::MISSION_TRAINS, Packets::Blips::MissionTrains* pMiss
 		return;
 
 	CMissionTrainSync::HandlePacket(*pMissionTrains);
+}
+
+PACKET_HANDLER(ePacketType::SAVE_FILE_CHUNK, Packets::Blips::SaveFileChunk* pSaveFileChunk)
+{
+	if (CLocalPlayer::m_bIsHost)
+		return;
+
+	CSaveSync::HandlePacket(*pSaveFileChunk);
+}
+
+PACKET_HANDLER(ePacketType::SAVE_REQUEST, Packets::Blips::SaveRequest* pSaveRequest)
+{
+	if (!CLocalPlayer::m_bIsHost)
+		return;
+
+	CSaveSync::HandlePacket(*pSaveRequest);
 }

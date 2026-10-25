@@ -41,6 +41,7 @@
 #include "CMissionPickupSync.h"
 #include "CMissionFireSync.h"
 #include "CMissionTrainSync.h"
+#include "CSaveSync.h"
 #include "CCrashLog.h"
 
 unsigned int lastOnFootSyncTickRate = 0;
@@ -99,6 +100,7 @@ public:
             CDebugVehicleSpawner::Process();
             { CCoopPerf::Scope p(CCoopPerf::AUTOTEST); CAutoTest::ProcessGame(); }
             CCustomMenuManager::CloseFocusPauseMenu();
+            CSaveSync::Process();
 
             if (/*CNetwork::m_bConnected*/ CNetwork::m_bAuthenticated)
             {
