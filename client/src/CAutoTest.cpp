@@ -1,4 +1,5 @@
 ﻿#include "stdafx.h"
+#include <shlobj.h>
 #include "CAutoTest.h"
 #include "Hooks/VehicleHooks.h"
 #include "CRadarSync.h"
@@ -23,6 +24,7 @@
 namespace fs = std::filesystem;
 
 static fs::path ms_dir;
+static std::string ms_docsDir;  // test games' own Documents\GTA San Andreas User Files, see ApplyTestUserDir
 static char ms_ip[129] = "127.0.0.1";
 static unsigned short ms_port = Config::DEFAULT_PORT;
 static char ms_name[Config::MAX_NICKNAME_LENGTH + 1] = "Tester";
@@ -111,14 +113,18 @@ static HWND WINAPI SetFocus_Hidden(HWND) { return GetFocus(); }
 static HWND WINAPI SetActiveWindow_Hidden(HWND) { return GetActiveWindow(); }
 static BOOL WINAPI BringWindowToTop_Hidden(HWND) { return TRUE; }
 
-static void PatchGameImport(const char* name, void* replacement)
+static int PatchGameImport(const char* name, void* replacement, const char* dll = "user32.dll")
 {
     auto base = (uint8_t*)GetModuleHandleA(NULL);
     auto nt = (IMAGE_NT_HEADERS*)(base + ((IMAGE_DOS_HEADER*)base)->e_lfanew);
     auto& dir = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
-    void* target = (void*)GetProcAddress(GetModuleHandleA("user32.dll"), name);
+    HMODULE module = GetModuleHandleA(dll);
+    if (!module)
+        module = LoadLibraryA(dll);
+    void* target = module ? (void*)GetProcAddress(module, name) : nullptr;
+    int patched = 0;
     if (!dir.VirtualAddress || !target)
-        return;
+        return 0;
     for (auto imp = (IMAGE_IMPORT_DESCRIPTOR*)(base + dir.VirtualAddress); imp->Name; imp++)
     {
         for (auto thunk = (IMAGE_THUNK_DATA*)(base + imp->FirstThunk); thunk->u1.Function; thunk++)
@@ -129,10 +135,36 @@ static void PatchGameImport(const char* name, void* replacement)
             VirtualProtect(&thunk->u1.Function, sizeof(void*), PAGE_READWRITE, &old);
             thunk->u1.Function = (uintptr_t)replacement;
             VirtualProtect(&thunk->u1.Function, sizeof(void*), old, &old);
+            patched++;
         }
     }
+    return patched;
 }
 
+// test games keep their saves, settings and user tracks in their own folder: every copy of the game would otherwise
+// share the player's real Documents\GTA San Andreas User Files. The game gets that folder from GetUserFilesFolder
+// (0x744FB0, behind the copy protection), called from three places: each call is wrapped and the folder it filled
+// (0xC92368) replaced by the test folder before anything uses it. From the very first call - switching the folder
+// while the game was running crashed its file handling.
+static char* __cdecl GetUserFilesFolder_Test()
+{
+    char* folder = plugin::CallAndReturn<char*, 0x744FB0>();
+    if (!ms_docsDir.empty())
+    {
+        // a fresh folder like a real one: settings and the user track index (the game crashed on missing ones);
+        // the real folder is only read
+        std::error_code ec;
+        if (!fs::exists(ms_docsDir, ec))
+        {
+            fs::create_directories(fs::path(ms_docsDir) / "User Tracks", ec);
+            for (const char* name : {"gta_sa.set", "sa-ufiles.dat", "sa-utrax.dat"})
+                fs::copy_file(fs::path(folder) / name, fs::path(ms_docsDir) / name, ec);
+        }
+        strncpy_s((char*)0xC92368, 256, ms_docsDir.c_str(), _TRUNCATE);
+        folder = (char*)0xC92368;
+    }
+    return folder;
+}
 static void __cdecl UpdatePads_Hook();
 
 // test runs only: when the game loop stops (a hang, no crash log), write where the main thread is stuck to hang.txt:
@@ -247,6 +279,12 @@ void CAutoTest::Init()
     std::error_code ec;
     fs::create_directories(ms_dir, ec);
     StartHangWatchdog();
+    // short, like the real one: the game builds file names from it in small fixed-size buffers
+    char temp[MAX_PATH] = "";
+    GetTempPathA(MAX_PATH, temp);
+    ms_docsDir = (fs::path(temp) / ("coopt-" + ms_dir.filename().string()) / "GTA San Andreas User Files").string();
+    for (uintptr_t site : {0x747470, 0x538860, 0x619075})  // every call of GetUserFilesFolder
+        patch::RedirectCall(site, GetUserFilesFolder_Test);
 
     Event("boot", "\"ip\":\"" + JsonEscape(ms_ip) + "\",\"port\":" + std::to_string(ms_port) + ",\"name\":\"" +
                       JsonEscape(ms_name) + "\",\"version\":\"" COOPANDREAS_VERSION "\"");
@@ -638,6 +676,7 @@ void CAutoTest::WriteStatus(bool inGame)
            << ",\"missionPickups\":" << CMissionPickupSync::GetCount() << ",\"missionFires\":" << CMissionFireSync::GetCount()
            << ",\"trainInfo\":\"" << CMissionTrainSync::Describe() << "\""
            << ",\"trains\":" << CMissionTrainSync::GetCount() << ",\"trainOffset\":" << CMissionTrainSync::GetMaxOffset()
+           << ",\"userDir\":\"" << JsonEscape((const char*)0xC92368) << "\",\"savePrefix\":\"" << JsonEscape((const char*)0xC16F18) << "\""
            << ",\"minigame\":" << (CTheScripts::bMiniGameInProgress ? "true" : "false")
            << ",\"coopUs\":{\"net\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::NET] << ",\"process\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PROCESS] << ",\"draw\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::DRAW] << ",\"autotest\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::AUTOTEST] << ",\"peds\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PEDS] << ",\"vehicles\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::VEHICLES] << ",\"tags\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::TAGS] << ",\"chatAndRest\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::CHAT] << ",\"playerList\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PLAYERLIST] << ",\"checkpoint\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::CHECKPOINT] << ",\"input\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::INPUT] << ",\"version\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::VERSION] << "}"
            << ",\"widescreen\":" << (TheCamera.m_bWideScreenOn ? "true" : "false")
