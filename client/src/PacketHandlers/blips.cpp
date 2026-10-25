@@ -7,6 +7,7 @@
 #include "CMissionFireSync.h"
 #include "CMissionTrainSync.h"
 #include "CSaveSync.h"
+#include "CUserTrackSync.h"
 
 PACKET_HANDLER(ePacketType::UPDATE_CHECKPOINT, Packets::Blips::UpdateCheckpoint* pUpdateCheckpoint)
 {
@@ -86,4 +87,19 @@ PACKET_HANDLER(ePacketType::SAVE_REQUEST, Packets::Blips::SaveRequest* pSaveRequ
 		return;
 
 	CSaveSync::HandlePacket(*pSaveRequest);
+}
+
+PACKET_HANDLER(ePacketType::USER_TRACK_LIST, Packets::Blips::UserTrackList* pUserTrackList)
+{
+	CUserTrackSync::HandlePacket(*pUserTrackList);
+}
+
+PACKET_HANDLER(ePacketType::USER_TRACK_REQUEST, Packets::Blips::UserTrackRequest* pUserTrackRequest)
+{
+	CUserTrackSync::HandlePacket(*pUserTrackRequest);
+}
+
+PACKET_HANDLER(ePacketType::USER_TRACK_CHUNK, Packets::Blips::UserTrackChunk* pUserTrackChunk)
+{
+	CUserTrackSync::HandlePacket(*pUserTrackChunk);
 }

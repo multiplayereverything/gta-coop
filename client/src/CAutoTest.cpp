@@ -11,6 +11,7 @@
 #include "CMissionFireSync.h"
 #include "CMissionTrainSync.h"
 #include "CSaveSync.h"
+#include "CUserTrackSync.h"
 #include <CStats.h>
 #include <CGenericGameStorage.h>
 #include <CClothes.h>
@@ -159,10 +160,10 @@ static char* __cdecl GetUserFilesFolder_Test()
         // a fresh folder like a real one: settings and the user track index (the game crashed on missing ones);
         // the real folder is only read
         std::error_code ec;
-        if (!fs::exists(ms_docsDir, ec))
+        fs::create_directories(fs::path(ms_docsDir) / "User Tracks", ec);
+        for (const char* name : {"gta_sa.set", "sa-ufiles.dat", "sa-utrax.dat"})
         {
-            fs::create_directories(fs::path(ms_docsDir) / "User Tracks", ec);
-            for (const char* name : {"gta_sa.set", "sa-ufiles.dat", "sa-utrax.dat"})
+            if (!fs::exists(fs::path(ms_docsDir) / name, ec))
                 fs::copy_file(fs::path(folder) / name, fs::path(ms_docsDir) / name, ec);
         }
         strncpy_s((char*)0xC92368, 256, ms_docsDir.c_str(), _TRUNCATE);
@@ -692,6 +693,7 @@ void CAutoTest::WriteStatus(bool inGame)
            << ",\"trainInfo\":\"" << CMissionTrainSync::Describe() << "\""
            << ",\"trains\":" << CMissionTrainSync::GetCount() << ",\"trainOffset\":" << CMissionTrainSync::GetMaxOffset()
            << ",\"userDir\":\"" << JsonEscape((const char*)0xC92368) << "\",\"savePrefix\":\"" << JsonEscape((const char*)0xC16F18) << "\""
+           << ",\"userTracksReceived\":" << CUserTrackSync::GetReceivedCount()
            << ",\"minigame\":" << (CTheScripts::bMiniGameInProgress ? "true" : "false")
            << ",\"coopUs\":{\"net\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::NET] << ",\"process\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PROCESS] << ",\"draw\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::DRAW] << ",\"autotest\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::AUTOTEST] << ",\"peds\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PEDS] << ",\"vehicles\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::VEHICLES] << ",\"tags\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::TAGS] << ",\"chatAndRest\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::CHAT] << ",\"playerList\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PLAYERLIST] << ",\"checkpoint\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::CHECKPOINT] << ",\"input\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::INPUT] << ",\"version\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::VERSION] << "}"
            << ",\"widescreen\":" << (TheCamera.m_bWideScreenOn ? "true" : "false")

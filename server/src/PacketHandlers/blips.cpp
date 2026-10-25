@@ -90,3 +90,27 @@ PACKET_HANDLER(ePacketType::SAVE_REQUEST, Packets::Blips::SaveRequest* pSaveRequ
         GetPacketFactory().Send(*pSaveRequest, pHost);
     }
 }
+
+PACKET_HANDLER(ePacketType::USER_TRACK_LIST, Packets::Blips::UserTrackList* pUserTrackList, CNetworkPlayer* pNetworkPlayer)
+{
+    pUserTrackList->senderPlayerid = pNetworkPlayer->m_playerId;
+    GetPacketFactory().SendToAll(*pUserTrackList, pNetworkPlayer);
+}
+
+PACKET_HANDLER(ePacketType::USER_TRACK_REQUEST, Packets::Blips::UserTrackRequest* pUserTrackRequest, CNetworkPlayer* pNetworkPlayer)
+{
+    pUserTrackRequest->senderPlayerid = pNetworkPlayer->m_playerId;
+    if (auto pOwner = CNetworkPlayerManager::GetPlayer(pUserTrackRequest->owner))
+    {
+        GetPacketFactory().Send(*pUserTrackRequest, pOwner);
+    }
+}
+
+PACKET_HANDLER(ePacketType::USER_TRACK_CHUNK, Packets::Blips::UserTrackChunk* pUserTrackChunk, CNetworkPlayer* pNetworkPlayer)
+{
+    pUserTrackChunk->senderPlayerid = pNetworkPlayer->m_playerId;
+    if (auto pTarget = CNetworkPlayerManager::GetPlayer(pUserTrackChunk->to))
+    {
+        GetPacketFactory().Send(*pUserTrackChunk, pTarget);
+    }
+}

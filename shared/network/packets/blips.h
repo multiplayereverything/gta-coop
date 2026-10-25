@@ -305,4 +305,84 @@ private:
         return true;
     }
 };
+// user tracks (custom songs): every player tells the others which songs it has
+class UserTrackList : public Packet
+{
+    DEFINE_PACKET_TYPE(UserTrackList, ePacketType::USER_TRACK_LIST, ePacketChannel::SCRIPT);
+
+public:
+    static constexpr int MAX_ENTRIES = 40;
+    static constexpr int MAX_NAME = 96;
+
+    SenderPlayerId senderPlayerid{};
+    uint8_t count = 0;
+    char names[MAX_ENTRIES][MAX_NAME]{};
+    uint32_t sizes[MAX_ENTRIES]{};
+
+private:
+    template <typename Stream>
+    bool Serialize(Stream& stream)
+    {
+        serialize_object(stream, senderPlayerid);
+        serialize_int(stream, count, 0, MAX_ENTRIES);
+        for (int i = 0; i < count; i++)
+        {
+            serialize_string(stream, names[i], MAX_NAME);
+            serialize_bits(stream, sizes[i], 32);
+        }
+        return true;
+    }
+};
+
+// asks the owner for one song (requester -> owner)
+class UserTrackRequest : public Packet
+{
+    DEFINE_PACKET_TYPE(UserTrackRequest, ePacketType::USER_TRACK_REQUEST, ePacketChannel::SCRIPT);
+
+public:
+    SenderPlayerId senderPlayerid{};
+    playerid_t owner{};
+    char name[UserTrackList::MAX_NAME]{};
+
+private:
+    template <typename Stream>
+    bool Serialize(Stream& stream)
+    {
+        serialize_object(stream, senderPlayerid);
+        serialize_playerid(stream, owner);
+        serialize_string(stream, name, UserTrackList::MAX_NAME);
+        return true;
+    }
+};
+
+// a piece of a song (owner -> requester)
+class UserTrackChunk : public Packet
+{
+    DEFINE_PACKET_TYPE(UserTrackChunk, ePacketType::USER_TRACK_CHUNK, ePacketChannel::SCRIPT);
+
+public:
+    static constexpr int MAX_DATA = 7000;
+
+    SenderPlayerId senderPlayerid{};
+    playerid_t to{};
+    char name[UserTrackList::MAX_NAME]{};
+    uint32_t size = 0;
+    uint32_t offset = 0;
+    uint16_t length = 0;
+    uint8_t data[MAX_DATA]{};
+
+private:
+    template <typename Stream>
+    bool Serialize(Stream& stream)
+    {
+        serialize_object(stream, senderPlayerid);
+        serialize_playerid(stream, to);
+        serialize_string(stream, name, UserTrackList::MAX_NAME);
+        serialize_bits(stream, size, 32);
+        serialize_bits(stream, offset, 32);
+        serialize_int(stream, length, 0, MAX_DATA);
+        serialize_bytes(stream, data, length);
+        return true;
+    }
+};
 }  // namespace Packets::Blips
