@@ -34,6 +34,7 @@
 #include "Commands/Commands/CCommandTeleportPlayersToHostSafely.h"
 #include "CMissionPartnerVehicles.h"
 #include "CCutscenePlayerHider.h"
+#include "CCutsceneCleanup.h"
 #include "CAreaConsistency.h"
 #include "CCustomMenuManager.h"
 #include "CCoopPerf.h"
@@ -108,6 +109,7 @@ public:
             if (/*CNetwork::m_bConnected*/ CNetwork::m_bAuthenticated)
             {
                 CCutscenePlayerHider::Process();
+                CCutsceneCleanup::Process();
                 CAreaConsistency::Process();
 
                 // TODO: refactor

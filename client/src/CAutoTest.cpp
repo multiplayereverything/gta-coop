@@ -327,7 +327,9 @@ static CRunningScript* FindMissionScript()
     {
         if (strncmp(s->m_szName, "coopand", 7) == 0)
             continue;
-        if (s->m_bIsMission || (s->m_pBaseIP >= missionBlock && s->m_pBaseIP < missionBlock + 69000))
+        // also helper threads a mission started: they run code inside the mission block (their base may be elsewhere)
+        if (s->m_bIsMission || (s->m_pBaseIP >= missionBlock && s->m_pBaseIP < missionBlock + 69000) ||
+            (s->m_pCurrentIP >= missionBlock && s->m_pCurrentIP < missionBlock + 69000))
             return s;
     }
     return nullptr;
@@ -699,6 +701,7 @@ void CAutoTest::WriteStatus(bool inGame)
            << ",\"userTracksReceived\":" << CUserTrackSync::GetReceivedCount()
            << ",\"radioStation\":" << (AudioEngine.IsRadioOn() ? (int)AudioEngine.GetCurrentRadioStationID() : 0)
            << ",\"zoneInfo\":\"" << [] { CPlayerPed* me = FindPlayerPed(0); CVector pos = me ? me->GetPosition() : CVector(); CZoneInfo* info = CTheZones::GetZoneInfo(&pos, nullptr); std::ostringstream o; o << std::hex << (uintptr_t)info << std::dec << " count " << *(int16_t*)0xBA1DE8 << " gangs"; for (int g = 0; info && g < 10; g++) o << " " << (int)(uint8_t)info->m_nGangDensity[g]; return o.str(); }() << "\""
+           << ",\"missionBlockScripts\":\"" << [] { std::string s; const uint8_t* block = (const uint8_t*)CTheScripts::ScriptSpace + 200000; for (CRunningScript* r = CTheScripts::pActiveScripts; r; r = r->m_pNext) if (r->m_bIsMission || (r->m_pCurrentIP >= block && r->m_pCurrentIP < block + 69000)) { s += std::string(r->m_szName, strnlen(r->m_szName, 8)) + (r->m_bIsMission ? "(m) " : " "); } return s; }() << "\""
            << ",\"minigame\":" << (CTheScripts::bMiniGameInProgress ? "true" : "false")
            << ",\"coopUs\":{\"net\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::NET] << ",\"process\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PROCESS] << ",\"draw\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::DRAW] << ",\"autotest\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::AUTOTEST] << ",\"peds\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PEDS] << ",\"vehicles\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::VEHICLES] << ",\"tags\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::TAGS] << ",\"chatAndRest\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::CHAT] << ",\"playerList\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PLAYERLIST] << ",\"checkpoint\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::CHECKPOINT] << ",\"input\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::INPUT] << ",\"version\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::VERSION] << "}"
            << ",\"widescreen\":" << (TheCamera.m_bWideScreenOn ? "true" : "false")
@@ -945,7 +948,12 @@ void CAutoTest::Execute(const std::string& line)
     }
     else if (verb == "heal")
     {
-        player->m_fHealth = player->m_fMaxHealth;
+        // only a living player: "healing" one that is dying half-revived it, the death/restart went wrong and the
+        // next mission launch crashed (a test-only action, players cannot do this)
+        if (player->m_fHealth > 0.0f && CWorld::Players[0].m_nPlayerState == PLAYERSTATE_PLAYING)
+            player->m_fHealth = player->m_fMaxHealth;
+        else
+            result = "not alive";
     }
     else if (verb == "kill")
     {
@@ -1328,6 +1336,9 @@ void CAutoTest::Execute(const std::string& line)
         // (e.g. INITIAL right after a new game) overwrites its code and crashes on a garbage opcode
         else if (FindMissionScript())
             result = "mission script running: " + GetMissionScriptName();
+        // a player cannot start a mission while wasted, busted or respawning (marker triggers are off then)
+        else if (player->m_fHealth <= 0.0f || CWorld::Players[0].m_nPlayerState != PLAYERSTATE_PLAYING)
+            result = "player not playing (wasted, busted or respawning)";
         else if (id < 0)
             result = "usage: startmission <id>";
         else
