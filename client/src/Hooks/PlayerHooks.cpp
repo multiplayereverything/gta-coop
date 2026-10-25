@@ -5,6 +5,7 @@
 #include <game_sa/CPedDamageResponseInfo.h>
 #include <CPacketBuffer.h>
 #include <CServerTime.h>
+#include "CMissionDeathCheck.h"
 
 static void __fastcall CPlayerPed__ProcessControl_Hook(CPlayerPed* This)
 {
@@ -326,16 +327,21 @@ void __fastcall CRunningScript__DoDeatharrestCheck_Hook(CRunningScript* This, SK
         {
             if (auto ped = networkPlayer->m_pPed)
             {
+                // a dead player's ped can stay in an idle state with 0 health (the mission went on)
                 if (ped->m_ePedState == PEDSTATE_ARRESTED || ped->m_ePedState == PEDSTATE_DEAD ||
-                    (ped->m_ePedState == PEDSTATE_DIE && ped->m_nPedFlags.bIsDyingStuck))
+                    (ped->m_ePedState == PEDSTATE_DIE && ped->m_nPedFlags.bIsDyingStuck) || ped->m_fHealth <= 0.0f)
                 {
-                    wastedOrBusted = true;
+                    // one still lying dead from before the mission failed it at once
+                    if (CMissionDeathCheck::WasAliveThisMission(ped))
+                        wastedOrBusted = true;
                 }
             }
         }
     }
 
-    if (wastedOrBusted)
+    // nothing to return to before the mission's first gosub: --m_nSP wrapped to 65535 and the script jumped to a
+    // garbage address (the host crashed starting a mission while a partner was still dead)
+    if (wastedOrBusted && This->m_nSP > 0)
     {
         CMessages::ClearSmallMessagesOnly();
         memset(&CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag], 0, sizeof(uint32_t));

@@ -35,6 +35,7 @@
 #include "CMissionPartnerVehicles.h"
 #include "CCutscenePlayerHider.h"
 #include "CCutsceneCleanup.h"
+#include "CMissionDeathCheck.h"
 #include "CAreaConsistency.h"
 #include "CCustomMenuManager.h"
 #include "CCoopPerf.h"
@@ -110,6 +111,7 @@ public:
             {
                 CCutscenePlayerHider::Process();
                 CCutsceneCleanup::Process();
+                CMissionDeathCheck::Process();
                 CAreaConsistency::Process();
 
                 // TODO: refactor
