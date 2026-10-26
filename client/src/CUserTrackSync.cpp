@@ -62,6 +62,28 @@ static bool IsSongName(const std::string& name)
     return ext == ".mp3" || ext == ".ogg" || ext == ".wav" || ext == ".wma";
 }
 
+// the file really is that kind of audio: a renamed or broken file made the user-track radio freeze the game for
+// seconds when it stopped or retuned (testing/usertrack-hang.ps1), and sharing would put it on every player's PC
+static bool LooksLikeAudio(const fs::path& file, const std::string& name)
+{
+    std::string ext = fs::u8path(name).extension().string();
+    for (char& c : ext)
+        c = (char)tolower((unsigned char)c);
+    uint8_t h[12] = {};
+    std::ifstream f(file, std::ios::binary);
+    if (!f.read((char*)h, sizeof(h)))
+        return false;
+    if (ext == ".mp3")
+        return memcmp(h, "ID3", 3) == 0 || (h[0] == 0xFF && (h[1] & 0xE0) == 0xE0);
+    if (ext == ".ogg")
+        return memcmp(h, "OggS", 4) == 0;
+    if (ext == ".wav")
+        return memcmp(h, "RIFF", 4) == 0 && memcmp(h + 8, "WAVE", 4) == 0;
+    if (ext == ".wma")
+        return memcmp(h, "\x30\x26\xB2\x75\x8E\x66\xCF\x11", 8) == 0;  // ASF header
+    return false;
+}
+
 static void SendList()
 {
     std::error_code ec;
@@ -75,7 +97,7 @@ static void SendList()
         }
         std::string name = entry.path().filename().u8string();
         uint64_t size = entry.is_regular_file(ec) ? entry.file_size(ec) : 0;
-        if (!IsSongName(name) || size == 0 || size > MAX_SONG_SIZE)
+        if (!IsSongName(name) || size == 0 || size > MAX_SONG_SIZE || !LooksLikeAudio(entry.path(), name))
             continue;
         strcpy_s(packet.names[packet.count], name.c_str());
         packet.sizes[packet.count] = (uint32_t)size;
@@ -95,6 +117,11 @@ static void FinishDownload(bool ok)
     ms_downloadFile.close();
     fs::path part = fs::u8path(CUserTrackSync::Folder()) / fs::u8path(ms_downloading + ".coopdl");
     std::error_code ec;
+    if (ok && !LooksLikeAudio(part, ms_downloading))
+    {
+        CAutoTest::Event("user_track_rejected", "\"size\":" + std::to_string(ms_downloadSize));
+        ok = false;
+    }
     if (ok)
     {
         fs::rename(part, fs::u8path(CUserTrackSync::Folder()) / fs::u8path(ms_downloading), ec);
