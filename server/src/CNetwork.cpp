@@ -8,6 +8,7 @@
 #include "stdafx.h"
 #include <network/packets/vehicles.h>
 #include <network/packets/peds.h>
+#include <network/packets/blips.h>
 #include <network/packets/scripts.h>
 
 bool CNetwork::Init(unsigned short port)
@@ -41,6 +42,7 @@ bool CNetwork::Init(unsigned short port)
     {
         CServerTime::Update();
         CRTTBroadcastManager::Update();
+        CNetwork::CheckSilentPlayers();
 
         while (enet_host_service(pENetHost, &eNetEvent, 1) > 0)
         {
@@ -379,5 +381,31 @@ void CNetwork::SendPacketToAll(const uint8_t* data, int dataSize, ePacketChannel
                 enet_peer_send(pNetworkPlayer->m_pPeer, static_cast<uint8_t>(packetChannel), pENetPacket);
             }
         }
+    }
+}
+
+void CNetwork::CheckSilentPlayers()
+{
+    // a game closed hard stays in the session until ENet's 30-60 s timeout (kept long so a short outage is survived);
+    // meanwhile everyone is told the player has gone silent, so their CJ is not mistaken for someone standing there
+    static uint32_t lastCheck = 0;
+    uint32_t now = enet_time_get();
+    if ((int32_t)(now - lastCheck) < 1000)
+        return;
+    lastCheck = now;
+    for (auto* pNetworkPlayer : CNetworkPlayerManager::m_pPlayers)
+    {
+        ENetPeer* peer = pNetworkPlayer->m_pPeer;
+        if (!peer)
+            continue;
+        bool lost = (int32_t)(now - peer->lastReceiveTime) > 5000;
+        if (lost == pNetworkPlayer->m_bConnectionLost)
+            continue;
+        pNetworkPlayer->m_bConnectionLost = lost;
+        printf("[Game] : %s %s.\n", pNetworkPlayer->m_Name, lost ? "went silent (connection lost)" : "is back");
+        Packets::Blips::PlayerConnectionState packet{};
+        packet.player = pNetworkPlayer->m_playerId;
+        packet.lost = lost;
+        GetPacketFactory().SendToAll(packet, pNetworkPlayer);
     }
 }

@@ -23,4 +23,5 @@ public:
 private:
     static void HandlePeerConnected(ENetEvent& event);
     static void HandlePlayerDisconnected(ENetEvent& event);
+    static void CheckSilentPlayers();
 };

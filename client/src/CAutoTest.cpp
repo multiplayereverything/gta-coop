@@ -12,6 +12,7 @@
 #include "CMissionTrainSync.h"
 #include "CSaveSync.h"
 #include "CUserTrackSync.h"
+#include "CPlaytestReport.h"
 #include <CStats.h>
 #include <CTheZones.h>
 #include <CAERadioTrackManager.h>
@@ -949,7 +950,7 @@ void CAutoTest::WriteStatus(bool inGame)
             if (player && player->m_matrix)
                 js << ",\"distance\":" << (p - player->m_matrix->pos).Magnitude();
             js << ",\"inVehicle\":" << (np->m_pPed->m_nPedFlags.bInVehicle ? "true" : "false");
-            js << ",\"health\":" << np->m_pPed->m_fHealth << ",\"pedState\":" << (int)np->m_pPed->m_ePedState;
+            js << ",\"health\":" << np->m_pPed->m_fHealth << ",\"pedState\":" << (int)np->m_pPed->m_ePedState << ",\"connectionLost\":" << (np->m_bConnectionLost ? "true" : "false");
         }
         js << "}";
         first = false;
@@ -1030,8 +1031,14 @@ void CAutoTest::Execute(const std::string& line)
         Packets::System::ChatMessage packet{};
         MultiByteToWideChar(CP_UTF8, 0, text.c_str(), -1, packet.message, Config::MAX_CHAT_MESSAGE_LENGTH);
         packet.message[Config::MAX_CHAT_MESSAGE_LENGTH] = L'\0';
-        CChat::AddPlayerChatMessage(CLocalPlayer::m_Name, packet.message);
-        GetPacketFactory().Send(packet);
+        // the same commands the chat box takes ("/report ...")
+        if (CPlaytestReport::HandleChatCommand(packet.message))
+            result = "command";
+        else
+        {
+            CChat::AddPlayerChatMessage(CLocalPlayer::m_Name, packet.message);
+            GetPacketFactory().Send(packet);
+        }
     }
     else if (verb == "teleport")
     {

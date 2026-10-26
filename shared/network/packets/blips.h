@@ -428,4 +428,23 @@ private:
         return true;
     }
 };
+// the server lost touch with a player (no packet at the network level for 5 s: game closed hard, PC or connection
+// gone) or got it back; a paused game still answers the server, so it does not count (server -> everyone)
+class PlayerConnectionState : public Packet
+{
+    DEFINE_PACKET_TYPE(PlayerConnectionState, ePacketType::PLAYER_CONNECTION_STATE, ePacketChannel::SCRIPT);
+
+public:
+    SenderPlayerId player{};
+    bool lost = false;
+
+private:
+    template <typename Stream>
+    bool Serialize(Stream& stream)
+    {
+        serialize_object(stream, player);
+        serialize_bool(stream, lost);
+        return true;
+    }
+};
 }  // namespace Packets::Blips

@@ -20,6 +20,7 @@ public:
     playerid_t m_playerId;
     char m_Name[32 + 1] = {0};
     bool m_bIsHost = false;
+    bool m_bConnectionLost = false;  // no packet at the network level for 5 s (see CNetwork::CheckSilentPlayers)
     int8_t m_nSeatId = -1;
     vehicleid_t m_vehicleId{};
     bool m_bCorrectVersion = false;

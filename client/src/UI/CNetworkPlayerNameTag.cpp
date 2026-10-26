@@ -177,7 +177,7 @@ void CNetworkPlayerNameTag::Process()
 			out.y - (PROPORION_Y(nicknameOffsetY) + PROPORION_Y(8.0f)),
 			scale,
 			alpha,
-			player->GetName().c_str()
+			(player->GetName() + (player->m_bConnectionLost ? " (connection lost)" : "")).c_str()
 		);
 		DrawWeaponIcon(
 			player->m_pPed,

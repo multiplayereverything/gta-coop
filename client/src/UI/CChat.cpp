@@ -1,6 +1,7 @@
 #include "config.h"
 #include "stdafx.h"
 #include "CUnicode.h"
+#include "CPlaytestReport.h"
 
 std::vector<CChatMessage> CChat::m_aMessages{};
 std::vector<std::wstring> CChat::m_aPrevMessages{};
@@ -523,6 +524,15 @@ void CChat::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
             if (IsInputTextEmpty(m_sInputText))
             {
+                m_sInputText.clear();
+                m_nCaretPos = 0;
+                return;
+            }
+
+            // "/report ...": a local playtest report, not a chat message
+            if (CPlaytestReport::HandleChatCommand(m_sInputText))
+            {
+                AddPreviousMessage(m_sInputText);
                 m_sInputText.clear();
                 m_nCaretPos = 0;
                 return;

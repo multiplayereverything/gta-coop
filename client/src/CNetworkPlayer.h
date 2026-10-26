@@ -35,6 +35,7 @@ public:
 	bool m_bRequestedDuckTask = false;
 
 	bool m_bIsHost = false;
+	bool m_bConnectionLost = false;  // the server lost touch with this player (game closed hard, connection gone)
 
 	~CNetworkPlayer();
 	CNetworkPlayer(playerid_t id, CVector position);

@@ -9,6 +9,7 @@
 #include "CSaveSync.h"
 #include "CUserTrackSync.h"
 #include "CCollectibleSync.h"
+#include "CAutoTest.h"
 #include "CGangZoneSync.h"
 
 PACKET_HANDLER(ePacketType::UPDATE_CHECKPOINT, Packets::Blips::UpdateCheckpoint* pUpdateCheckpoint)
@@ -117,4 +118,14 @@ PACKET_HANDLER(ePacketType::GANG_ZONES, Packets::Blips::GangZones* pGangZones)
 PACKET_HANDLER(ePacketType::COLLECTIBLE_COLLECTED, Packets::Blips::CollectibleCollected* pCollectibleCollected)
 {
 	CCollectibleSync::HandlePacket(*pCollectibleCollected);
+}
+
+PACKET_HANDLER(ePacketType::PLAYER_CONNECTION_STATE, Packets::Blips::PlayerConnectionState* pPlayerConnectionState)
+{
+	if (CNetworkPlayer* pNetworkPlayer = CNetworkPlayerManager::GetPlayer(pPlayerConnectionState->player))
+	{
+		pNetworkPlayer->m_bConnectionLost = pPlayerConnectionState->lost;
+		CAutoTest::Event(pPlayerConnectionState->lost ? "player_connection_lost" : "player_connection_back",
+			"\"id\":" + std::to_string(pNetworkPlayer->m_playerId.value()));
+	}
 }
