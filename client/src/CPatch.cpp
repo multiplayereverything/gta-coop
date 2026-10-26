@@ -99,6 +99,16 @@ void CPatch::RevertTemporaryPatchesForHost()
     CPopulation::PedDensityMultiplier = 1.0f;
 }
 
+// vehicle struct pool: one entry per loaded vehicle model. 127 (the most a push imm8 holds) equalled the models
+// streaming may keep loaded (desiredNumVehiclesLoaded 127), so mission and other players' cars filled it and the next
+// model load crashed in CVehicleModelInfo::PreprocessHierarchy (4-player sweep, Zeroing In). The pool constructor call
+// at 0x5B8FE7 is wrapped to ask for 500.
+static uintptr_t ms_vehicleStructPoolCtor = 0;
+static void* __fastcall VehicleStructPool_Ctor_Hook(void* pool, void*, int size, const char* name)
+{
+    return ((void*(__thiscall*)(void*, int, const char*))ms_vehicleStructPoolCtor)(pool, size < 500 ? 500 : size, name);
+}
+
 void CPatch::PatchFramerate()
 {
     unsigned int fps = 60;
@@ -213,6 +223,12 @@ void PatchPools()
     // push 32h -> push 7Fh
     patch::SetUChar(0x5B8FE3+1, 0x7F);
     patch::SetUChar(0x5B8E6E + 6, 0x7F); // CStreaming::desiredNumVehiclesLoaded from 22 to 127
+    // ...and the pool itself to 500, so the models streaming keeps leave room (see VehicleStructPool_Ctor_Hook)
+    if (*(uint8_t*)0x5B8FE7 == 0xE8 && !CVehicleModelInfo::CVehicleStructure::m_pInfoPool)
+    {
+        ms_vehicleStructPoolCtor = injector::GetBranchDestination(0x5B8FE7).as_int();
+        patch::RedirectCall(0x5B8FE7, VehicleStructPool_Ctor_Hook);
+    }
 
     // CCarGenerator::Process 0x6F3EF5 CRASH FIX #95
     // orig: `movsx ecx, ax`

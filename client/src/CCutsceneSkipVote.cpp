@@ -125,7 +125,14 @@ static void CCutsceneMgr__StartCutscene_Hook()
         BroadcastState();
     }
 
+    unsigned int control = TheCamera.m_nWhoIsInControlOfTheCamera;
+    // a script still holding the camera (left by an earlier mission) kept the cutscene camera from taking over, and
+    // the game only checks the skip button while the cutscene camera runs: release it first
+    if (control == 1)
+        TheCamera.Restore();
     CCutsceneMgr::StartCutscene();
+    CAutoTest::Event("cutscene_camera", "\"controlBefore\":" + std::to_string(control) + ",\"mode\":" +
+                                            std::to_string(TheCamera.m_aCams[TheCamera.m_nActiveCam].m_nMode));
 }
 
 PACKET_HANDLER(ePacketType::CUTSCENE_SKIP_VOTE, Packets::Scripts::CutsceneSkipVote* pCutsceneSkipVote)

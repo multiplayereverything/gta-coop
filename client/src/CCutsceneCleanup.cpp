@@ -31,9 +31,34 @@ static void ProcessProofs()
     }
 }
 
+// A cutscene runs on its fly-by camera (mode 17). One whose camera went back to the player (seen after Supply Lines:
+// New Model Army's cutscene camera left within a second) can never reach its end, the game stops checking the skip
+// button and the mission waits forever. After 3 s like that it is finished the way a skip does it.
+static void ProcessStuckCutscene()
+{
+    static uint32_t offCameraSince = 0;
+    bool stuck = CCutsceneMgr::ms_running && CCutsceneMgr::ms_cutsceneLoadStatus == 2 &&
+                 TheCamera.m_aCams[TheCamera.m_nActiveCam].m_nMode != 17;
+    if (!stuck)
+    {
+        offCameraSince = 0;
+        return;
+    }
+    if (!offCameraSince)
+        offCameraSince = GetTickCount();
+    else if (GetTickCount() - offCameraSince > 3000)
+    {
+        offCameraSince = 0;
+        CAutoTest::Event("cutscene_unstuck", "\"name\":\"" + std::string(CCutsceneMgr::ms_cutsceneName, 0, 8) + "\"");
+        CCutsceneMgr::ms_wasCutsceneSkipped = true;
+        CCutsceneMgr::FinishCutscene();
+    }
+}
+
 void CCutsceneCleanup::Process()
 {
     ProcessProofs();
+    ProcessStuckCutscene();
 
     static bool wasOnMission = false;
     static uint32_t endedAt = 0;
@@ -58,6 +83,15 @@ void CCutsceneCleanup::Process()
         return;
     }
     endedAt = 0;
+
+    // a scripted camera the mission left behind (failed while it ran, e.g. Supply Lines' RC plane camera): nobody
+    // gives it back, the player is stuck with it and the next mission's cutscene camera could not take over (its
+    // skip check never ran: 4-player sweep, New Model Army and Up, Up and Away! stuck in their opening cutscene)
+    if (TheCamera.m_nWhoIsInControlOfTheCamera == 1 && !CCutsceneMgr::ms_running)  // 1 = script
+    {
+        CAutoTest::Event("script_camera_restored");
+        TheCamera.Restore();
+    }
 
     if (!endedName[0] || memcmp(endedName, CCutsceneMgr::ms_cutsceneName, 8) != 0 ||
         (!CCutsceneMgr::ms_running && CCutsceneMgr::ms_cutsceneLoadStatus == 0))
