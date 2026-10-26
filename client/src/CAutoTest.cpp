@@ -13,6 +13,7 @@
 #include "CSaveSync.h"
 #include "CUserTrackSync.h"
 #include "CPlaytestReport.h"
+#include <game_sa/CTagManager.h>
 #include <CStats.h>
 #include <CTheZones.h>
 #include <CAERadioTrackManager.h>
@@ -827,7 +828,7 @@ void CAutoTest::WriteStatus(bool inGame)
            << ",\"cutsceneGate\":{\"control\":" << TheCamera.m_nWhoIsInControlOfTheCamera << ",\"camMode\":" << TheCamera.m_aCams[TheCamera.m_nActiveCam].m_nMode << ",\"loadStatus\":" << (int)CCutsceneMgr::ms_cutsceneLoadStatus << ",\"finishIn\":" << ((int)TheCamera.GetCutSceneFinishTime() - (int)CTimer::m_snTimeInMilliseconds) << "}"
            << ",\"collectibles\":{\"horseshoes\":" << CStats::GetStatValue(STAT_HORSESHOES_COLLECTED)
            << ",\"oysters\":" << CStats::GetStatValue(STAT_OYSTERS_COLLECTED) << ",\"snapshots\":" << CStats::GetStatValue(STAT_SNAPSHOTS_TAKEN)
-           << ",\"tags\":" << CStats::GetStatValue(STAT_TAGS_SPRAYED) << ",\"pickups953\":" << CountPickups(953)
+           << ",\"tags\":" << CStats::GetStatValue(STAT_TAGS_SPRAYED) << ",\"tagsDone\":" << [] { int n = 0; for (auto& t : CTagManager::ms_tagDesc) if (t.m_pEntity && t.m_nAlpha >= 229) n++; return n; }() << ",\"pickups953\":" << CountPickups(953)
            << ",\"pickups954\":" << CountPickups(954) << ",\"pickups1253\":" << CountPickups(1253) << "}"
            << ",\"minigame\":" << (CTheScripts::bMiniGameInProgress ? "true" : "false")
            << ",\"coopUs\":{\"net\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::NET] << ",\"process\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PROCESS] << ",\"draw\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::DRAW] << ",\"autotest\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::AUTOTEST] << ",\"peds\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PEDS] << ",\"vehicles\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::VEHICLES] << ",\"tags\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::TAGS] << ",\"chatAndRest\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::CHAT] << ",\"playerList\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PLAYERLIST] << ",\"checkpoint\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::CHECKPOINT] << ",\"input\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::INPUT] << ",\"version\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::VERSION] << "}"
@@ -1184,6 +1185,47 @@ void CAutoTest::Execute(const std::string& line)
         for (CNetworkPlayer* np : CNetworkPlayerManager::m_pPlayers)
             if (np->m_pPed)
                 result += " p" + std::to_string(np->m_playerId.value()) + "=" + std::to_string(count(np->m_pPed->GetPosition()));
+    }
+    else if (verb == "spraytag")
+    {
+        // spraytag: go to the nearest tag not fully sprayed (within 100 m) and paint it over, then share it the way a
+        // spray does (WorldHooks: TagUpdate, fully sprayed). Aiming the can is the game's own code; what coop must get
+        // right is that the tag turns on every game and counts for the host's mission. result = "x y z" or "none"
+        CVector me = player->GetPosition();
+        tTagDesc* best = nullptr;
+        float bestDist = 100.0f;
+        for (auto& tag : CTagManager::ms_tagDesc)
+        {
+            if (!tag.m_pEntity || tag.m_nAlpha >= 229)
+                continue;
+            float d = (tag.m_pEntity->GetPosition() - me).Magnitude();
+            if (d < bestDist)
+            {
+                bestDist = d;
+                best = &tag;
+            }
+        }
+        if (!best)
+            result = "none";
+        else
+        {
+            CVector t = best->m_pEntity->GetPosition();
+            CVector away = me - t;
+            away.z = 0.0f;
+            if (away.Magnitude() < 0.1f)
+                away = CVector(1.0f, 0.0f, 0.0f);
+            away.Normalise();
+            player->Teleport(CVector(t.x + away.x * 1.8f, t.y + away.y * 1.8f, t.z), false);
+            CTagManager::SetAlpha(best->m_pEntity, 255);
+            Packets::World::TagUpdate packet{};
+            packet.payload.bFullySprayed = true;
+            packet.payload.alpha = 255;
+            packet.payload.pos_x = static_cast<int16_t>(floor(t.x));
+            packet.payload.pos_y = static_cast<int16_t>(floor(t.y));
+            packet.payload.pos_z = static_cast<int16_t>(floor(t.z));
+            GetPacketFactory().Send(packet);
+            result = std::to_string(t.x) + " " + std::to_string(t.y) + " " + std::to_string(t.z);
+        }
     }
     else if (verb == "nearpickup")
     {
