@@ -1,395 +1,60 @@
-# CoopAndreas
-[![Made in Ukraine](https://img.shields.io/badge/made_in-ukraine-ffd700.svg?labelColor=0057b7)](https://stand-with-ukraine.pp.ua)
+# GTA San Andreas Co-op
 
-Videos, pictures, news, suggestions, and communication can be found here:
+**GTA Co-op 1.0.0:** play the whole GTA San Andreas story with friends. Up to 4 players share one world: missions, cutscenes, money, saves, gang territories and collectibles stay in sync. It runs on **GTA San Andreas PC 1.0 US** (Windows), online over the internet, a VPN or your LAN.
 
-[![Discord](https://img.shields.io/badge/Discord%20Server%20(25,000+%20members)-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/Z3ugSgFJMU)
-[![YouTube](https://img.shields.io/badge/YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://www.youtube.com/@CoopAndreas)
+Created and largely built by **JessniX**, and maintained by **Multiplayer Everything** and **JessniX**. Based on [CoopAndreas](https://github.com/Tornamic/CoopAndreas) by Tornamic and its contributors (GPL-3.0).
 
-## Disclaimer
-This mod is an unofficial modification for **Grand Theft Auto: San Andreas** and requires a legitimate copy of the game to function. No original game files or assets from Rockstar Games are included in this repository, and all content provided is independently developed. The project is not affiliated with Rockstar Games or Take-Two Interactive. All rights to the original game, its assets, and intellectual property belong to Rockstar Games and Take-Two Interactive. This mod is created solely for educational and non-commercial purposes. Users must comply with the terms of service and license agreements of Rockstar Games.
+## Install
 
+1. You need your own **GTA San Andreas 1.0 US**. Steam and Rockstar Launcher copies must be downgraded to 1.0 first (search for "GTA SA downgrader"). The release contains no game files.
+2. Download `GTACoop-1.0.0.zip` from [Releases](https://github.com/multiplayereverything/gta-coop/releases).
+3. Copy everything in its `game` folder into your GTA San Andreas folder (next to `gta_sa.exe`) and run `install.bat` there once. `uninstall.bat` puts everything back.
 
-## Building (Windows)
+Everyone needs the same version (1.0.0). The server turns away other versions.
 
-### Client & Server
+## Play
 
-1. Make sure you have the **C++ package** installed in **Visual Studio 2022** and **[xmake](https://xmake.io/)** (needed to build the project).
+- **Host:** run `server\server.exe` and leave it open (UDP port 6767, up to 4 players, see `server-config.ini`). Friends reach you through a port forward of UDP 6767, or through a VPN such as Tailscale, ZeroTier or Radmin VPN (easiest).
+- **Everyone, the host too:** start `LaunchCoopAndreas.exe`, then Start Game, enter a nickname, the host's address (the host uses `127.0.0.1`) and port `6767`, and Connect.
+- **The host joins first.** The first player in runs the story.
 
-2. Open a terminal in the repository root and build the projects:
+Full guide: [docs/HOW-TO-PLAY.md](docs/HOW-TO-PLAY.md).
 
-```bash
-# Build client DLL
-xmake --build client
+## What's shared
 
-# Build server binary
-xmake --build server
-```
-If `GTA_SA_DIR` is set, the client DLL (`CoopAndreasSA.dll`) will automatically be placed in your game directory.
+- **Story missions:** objectives, markers, checkpoints, pickups, fires, trains, MISSION PASSED/FAILED, money rewards and the wanted level. Some missions are fully co-op. In the others the host drives the mission and everyone else follows it.
+- **Cutscenes:** everyone watches; they skip when every player presses skip.
+- **Mission cars:** when the mission's characters fill the car, the others get a spare copy of it (green blip).
+- **Saves:** whoever saves, everyone gets the host's progress and keeps their own look.
+- **The world:** gang territories and recruits, oysters, horseshoes, snapshots and tags, trailers, other players' cars and the radio (including User Tracks songs).
 
----
+## If something goes wrong
 
-### Proxy (DLL Loader)
+- Type `/report what happened` in chat (F6). It saves a report file in `CoopAndreas_reports` in your GTA folder. Send it to us with the newest file in `CoopAndreas_crashes` if the game crashed.
+- A friend whose game closed shows "(connection lost)" and can join again at once. Short Wi-Fi drops (up to about 30 s) don't throw anyone out.
+- Report bugs in [Issues](https://github.com/multiplayereverything/gta-coop/issues).
 
-The proxy is required to load (inject) the main DLL (`CoopAndreasSA.dll`) into the game executable.
+## Tested
 
-1. Go to your game directory and rename `eax.dll` to `eax_orig.dll`.
+- Automated lab tests with hidden copies of the game on one PC: 101 of 102 story missions with 2 players, and 102 missions in one 4-player session with no crash.
+- Real playthroughs with no shortcuts: Big Smoke, Ryder and Tagging Up Turf reached MISSION PASSED on both screens.
+- Bad connections from good Wi-Fi to very bad, rejoining, collectibles, gang recruits, save sync and shared radio.
 
-2. Build the **Proxy** project:
+## Known issues
 
-```bash
-xmake --build proxy
-```
+- A session between friends on separate PCs hasn't been tested by us yet.
+- On the host's screen, joined players' bodies can look crumpled.
+- Gang wars, buying property, stunt jumps and minigames (pool, basketball, dancing, casino) are each player's own.
+- Race missions can't be passed by the lab bots; they are untested in co-op.
+- CLEO+ breaks shooting sync (`install.bat` moves it out). Other mods may conflict; try without them first.
+- Crash logs are also sent to the original CoopAndreas author's server, as in CoopAndreas. See [PRIVACY.md](PRIVACY.md).
 
-3. Rename the output DLL to `eax.dll` and copy it to your game folder.
+## Build from source
 
----
+Windows, Visual Studio 2022 and [xmake](https://xmake.io). Run `xmake` in the repo root (release, x86); the files land in `build\windows\x86\release`. `testing\build.ps1` builds and can install into a game folder. The original CoopAndreas build notes are in [docs/COOPANDREAS-README.md](docs/COOPANDREAS-README.md).
 
-### Launcher
+For contributors and agents: [AGENTS.md](AGENTS.md) (how the code and tests are laid out), [MODLOG.md](MODLOG.md) (what changed and why), [docs/MISSIONS.md](docs/MISSIONS.md) (mission status) and `testing\` (the lab scripts).
 
-The launcher is required to start the game's executable and pass the needed cmd args.
+## License
 
-1. Build the **Launcher** project:
-
-```bash
-xmake --build launcher
-```
-
-2. Copy both `LaunchCoopAndreas.exe` and `LaunchCoopAndreas.exe.manifest` to your game folder.
-
----
-
-### `main.scm`
-
-1. Download and install **[Sanny Builder 4](https://github.com/sannybuilder/dev/releases)**.
-
-2. Copy all files from the `sdk/Sanny Builder 4/` directory to the **Sanny Builder 4 installation folder**.  
-   This will add **CoopAndreas opcodes** to the compiler.
-
-3. Open `scm/main.txt` in **Sanny Builder 4**, compile it, and copy all generated files to  
-   `${GTA_SA_DIR}/CoopAndreas/`.
-
----
-
-### Running CoopAndreas
-
-1. Run `server.exe` it will start accepting client connections.
-2. Run `LaunchCoopAndreas.exe`, and follow the serial key instructions, then click "Launch CoopAndreas".
-3. (in-game) press **Start Game**, enter your nickname, then provide the server IP and port.
-   - If the server is running on the same machine, use `127.0.0.1`
-   - Default port: `6767`
-
-
-## Building Server on GNU/Linux
-
-TODO
-
-## Donate
-
-PayPal: https://www.paypal.com/donate/?hosted_button_id=PSL39QT3X22LA
-
-USDT TRC20: `TNdTwiy9JM2zUe8qgBoMJoAExKf4gs5vGA`
-
-BTC: `bc1qwsl8jv2gyvry75j727qkktr5vgcmqm5e69qt2t`
-
-ETH: `0xE7aE0448A147844208C9D51b0Ac673Bafbe2a35c`
-
-monobank: https://send.monobank.ua/jar/8wPrs73MBa
-
-
-## TODO list:
-### Already Done ✓
-- [X] setup C/C++ project
-- [X] client - server connection
-- [X] On foot sync
-  - [x] Walk/Run
-  - [x] Jump
-  - [x] Climb
-  - [x] Crouch - (Fix Crouch Desync)
-  - [x] Hit/Fight
-- [X] Weapon sync
-  - [X] Hold weapon
-  - [X] Aim sync
-  - [X] Lag shot sync - using keys, bad accuracy
-  - [X] Shot sync - every bullet will be synced
-- [X] Players info
-  - [X] Health bar
-  - [X] Armour bar
-  - [X] Nickname
-  - [X] weapon icon
-- [X] explosion sync
-- [X] vehicle sync
-  - [X] spawn/delete
-  - [X] enter/exit
-  - [X] color(1/2) sync
-  - [X] paintjob sync
-  - [X] tuning sync
-  - [X] hydra thrusters
-  - [X] plane wheels
-  - [X] turret aim/shot
-  - [X] horn
-  - [X] keys (provides steer angles, brake, etc.)
-  - [X] pos, speed, quat
-  - [X] health
-  - [X] damage status
-  - [X] doors 
-	- [X] locked state
-  - [X] engine state
-- [X] chat
-- [X] time
-- [X] weather
-- [X] proper key sync
-- [X] rendering
-  - [X] text rendering (dx)
-  - [X] sprite/txd rendering
-- [X] style
-  - [X] tatoo
-  - [X] clothes
-  - [X] haircut
-- [X] separate ped sync
-- [X] EnEx markers sync
-- [X] mission markers sync
-  
-### Current Tasks
-If you are looking for something to contribute, better check the Issues tab.
-- [ ] pickups
-  - [ ] graffities, horseshoes, snapshots, oysters
-  - [ ] static weapons, armours
-  - [ ] static bribes
-  - [ ] drop
-    - [ ] money
-    - [ ] weapons
-- [ ] jetpack sync
-  - [X] flight 
-  - [ ] pickup (related to task above) 
-- [ ] cutscenes
-  - [X] cutscenes
-  - [ ] vote to skip
-- [ ] Players map sync
-  - [ ] Areas aka GangZones
-  - [X] Mission icons
-  - [X] Player map pin
-    - [ ] fix proportion
-  - [X] Player mark (waypoint)
-- [ ] wanted level
-- [ ] stats sync
-  - [X] fat
-  - [X] muscle
-  - [X] weapon skills
-  - [X] fight styles
-  - [ ] sync money
-  - [ ] breath level bar
-  - [X] stamina sync
-  - [ ] max hp sync
-- [ ] fire sync
-- [ ] cheat code sync
-- [ ] anim sync
-  - [X] sprunk drinking
-  - [X] fast food eating
-  - [ ] idle anims
-  - [ ] funny TAB+NUM4 (or NUM6) anim sync (did you know about this?)
-- [ ] gang groups sync
-- [ ] stream in/out players, peds, vehicles, etc.
-- [ ] vehicle sync
-  - [ ] force hydraulics sync
-  - [ ] trailer sync
-- [ ] passenger sync
-  - [ ] gamepad support
-  - [X] proper seat sync
-  - [ ] radio sync
-  - [X] drive by shooting
-- [ ] fixes
-  - [X] mouse
-  - [ ] widescreen
-  - [X] fast load
-- [ ] Fix models loading (green polygon)  --- related to stream it/out
-- [ ] smooth interpolation
-  - [ ] move
-  - [ ] rotation
-  - [X] weapon aim interpolation
-- [ ] npc sync
-  - [X] pos, rot, speed
-  - [X] weapons
-  - [ ] in vehicle sync
-    - [ ] driver
-      - [X] position velocity rotation  
-      - [X] gas/break lights
-      - [X] wheel movement
-      - [ ] horn
-      - [ ] siren
-      - [X] current path, target entity, mission
-    - [X] passenger
-  - [ ] aim
-  - [ ] shots
-  - [ ] task sync (good luck, warrior!)
-  - [X] radar icon?
-  - [X] speech sync
-- [ ] player voice commands
-- [ ] chat reactions (see LD_CHAT.txd)
-- [ ] gang wars sync
-- [ ] parachute jump sync
-- [ ] stunt
-  - [ ] collecting
-  - [ ] for-player slow motion
-- [ ] chat gamepad support with on-screen keyboard
-### Minor tasks and ideas
-- [ ] Sync laser sniper rifle red dot with all players
-- [X] Sync moon sniper rifle shot changing size easter egg with all players
-
-## TODO Missions
-### Already Done ✓
-### Current Tasks
-- [X] Big Smoke
-- [X] Ryder
-- [X] Tagging Up Turf
-- [X] Cleaning The Hood
-- [X] Drive-Thru
-- [ ] Nines And AK's
-- [ ] Drive-By
-- [ ] Sweet's Girl
-- [ ] Cesar Vialpando
-- [X] OG Loc
-- [X] Running Dog
-- [ ] Wrong Side Of The Tracks
-- [ ] Just Business
-- [ ] Home Invasion
-- [ ] Catalyst
-- [ ] Robbing Uncle Sam
-- [ ] Life's A Beach
-- [ ] Madd Dogg's Rhymes
-- [ ] Management Issues
-- [ ] House Party
-- [ ] High Stakes, Low Rider
-- [ ] Burning Desire
-- [ ] Gray Imports
-- [ ] Doberman
-- [ ] Los Sepulcros
-- [ ] Reuniting The Families
-- [ ] The Green Sabre
-- [ ] Badlands
-- [ ] Tanker Commander
-- [ ] Body Harvest
-- [ ] Local Liquor Store
-- [ ] Against All Odds
-- [ ] Small Town Bank
-- [ ] Wu Zi Mu
-- [ ] Farewell, My Love...
-- [ ] Are You Going To San Fierro?
-- [ ] Wear Flowers In Your Hair
-- [ ] 555 WE TIP
-- [ ] Deconstruction
-- [ ] Air Raid
-- [ ] Supply Lines...
-- [ ] New Model Army
-- [ ] Photo Opportunity
-- [ ] Jizzy
-- [ ] T-Bone Mendez
-- [ ] Mike Toreno
-- [ ] Outrider
-- [ ] Snail Trail
-- [ ] Ice Cold Killa
-- [ ] Pier 69
-- [ ] Toreno's Last Flight
-- [ ] Mountain Cloud Boys
-- [ ] Ran Fa Li
-- [ ] Lure
-- [ ] Amphibious Assault
-- [ ] The Da Nang Thang
-- [ ] Yay Ka-Boom-Boom
-- [ ] Zeroing In
-- [ ] Test Drive
-- [ ] Customs Fast Track
-- [ ] Puncture Wounds
-- [ ] Monster
-- [ ] Highjack
-- [ ] Interdiction
-- [ ] Verdant Meadows
-- [ ] N.O.E.
-- [ ] Stowaway
-- [ ] Black Project
-- [ ] Green Goo
-- [ ] Fender Ketchup
-- [ ] Explosive Situation
-- [ ] You've Had Your Chips
-- [ ] Don Peyote
-- [ ] Architectural Espionage
-- [ ] Key To Her Heart
-- [ ] Dam And Blast
-- [ ] Cop Wheels
-- [ ] Up, Up And Away!
-- [ ] Intensive Care
-- [ ] The Meat Business
-- [ ] Fish In A Barrel
-- [ ] Misappropriation
-- [ ] Madd Dogg
-- [ ] Freefall
-- [ ] High Noon
-- [ ] Saint Mark's Bistro
-- [ ] A Home In The Hills
-- [ ] Vertical Bird
-- [ ] Home Coming
-- [ ] Beat Down On B Dup
-- [ ] Grove 4 Life
-- [ ] Cut Throat Business
-- [ ] Riot
-- [ ] Los Desperados
-- [ ] End Of The Line
-
-## TODO Other Scripts
-### Already done ✓
-### Current Tasks
-- [ ] Property purchase sync
-- [ ] Submissions
-  - [ ] Taxi driver
-  - [ ] Firefighter
-  - [ ] Vigilante
-  - [ ] Paramedic
-  - [ ] Pimp
-  - [ ] Freight Train Missions
-- [ ] Hiden races
-  - [ ] BMX
-  - [ ] NRG-500
-  - [ ] The Chiliad Challenge 
-- [ ] Stadions
-  - [ ] 8-Track
-  - [ ] Blood Bowl
-  - [ ] Dirt Track
-  - [ ] Kick Start
-- [ ] Ammu-nation challenge
-- [ ] Schools
-  - [ ] Driving school
-  - [ ] Flight school
-  - [ ] Bike school
-  - [ ] Boat school
-- [ ] Asset Missions
-  - [ ] Trucker (8 missions)
-  - [ ] Valet (5 missions)
-  - [ ] Career (7 missions)
-- [ ] Courier
-  - [ ] Los Santos - Roboi's Food Mart
-  - [ ] San Fierro - Hippy Shopper
-  - [ ] Las Venturas - Burger Shot
-- [ ] Street Racing (22)
-  - [ ] Little Loop
-  - [ ] Backroad Wanderer
-  - [ ] City Circuit
-  - [ ] Vinewood
-  - [ ] Freeway
-  - [ ] Into The Country
-  - [ ] Dirtbike Danger
-  - [ ] Bandito Country
-  - [ ] Go-Go Karting
-  - [ ] San Fierro Fastlane
-  - [ ] San Fierro Hills
-  - [ ] Country Endurance
-  - [ ] SF To LV
-  - [ ] Dam Rider
-  - [ ] Desert Tricks
-  - [ ] LV Ringroad
-  - [ ] World War Ace
-  - [ ] Barnstorming
-  - [ ] Win Military Service
-  - [ ] Chopper Checkpoint
-  - [ ] Whirly Bird Waypoint
-  - [ ] Heli Hell
-- [ ] Import / Export
+GPL-3.0, like CoopAndreas. See [LICENSE](LICENSE). GTA San Andreas belongs to Rockstar Games; this project is not affiliated with them.

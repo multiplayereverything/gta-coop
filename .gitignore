@@ -12,3 +12,8 @@ vsxmake2022/
 vsxmake2026/
 output/
 compile_commands.json
+# lab output and private files
+testing/reports/
+.discord-webhook
+CoopAndreas_reports/
+CoopAndreas_crashes/
