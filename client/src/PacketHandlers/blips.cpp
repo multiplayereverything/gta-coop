@@ -8,6 +8,7 @@
 #include "CMissionTrainSync.h"
 #include "CSaveSync.h"
 #include "CUserTrackSync.h"
+#include "CCollectibleSync.h"
 #include "CGangZoneSync.h"
 
 PACKET_HANDLER(ePacketType::UPDATE_CHECKPOINT, Packets::Blips::UpdateCheckpoint* pUpdateCheckpoint)
@@ -111,4 +112,9 @@ PACKET_HANDLER(ePacketType::GANG_ZONES, Packets::Blips::GangZones* pGangZones)
 		return;
 
 	CGangZoneSync::HandlePacket(*pGangZones);
+}
+
+PACKET_HANDLER(ePacketType::COLLECTIBLE_COLLECTED, Packets::Blips::CollectibleCollected* pCollectibleCollected)
+{
+	CCollectibleSync::HandlePacket(*pCollectibleCollected);
 }

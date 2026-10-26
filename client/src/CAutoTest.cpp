@@ -614,6 +614,17 @@ void CAutoTest::ProcessPad()
 // "animprobe on" starts autotest/<dir>/anim.probe.jsonl, "animprobe off" stops it.
 static bool ms_bAnimProbe = false;
 
+// collectibles left in the world (953 oyster, 954 horseshoe, 1253 snapshot), for the collectibles tests
+static int CountPickups(int model)
+{
+    int n = 0;
+    for (int i = 0; i < MAX_NUM_PICKUPS; i++)
+        if (CPickups::aPickUps[i].m_nPickupType != PICKUP_NONE && CPickups::aPickUps[i].m_nModelIndex == model &&
+            !CPickups::aPickUps[i].m_nFlags.bDisabled)
+            n++;
+    return n;
+}
+
 static void WriteProbeActor(std::ostringstream& o, CPed* ped, uint32_t ref)
 {
     static const std::pair<const char*, unsigned> bones[] = {
@@ -807,6 +818,10 @@ void CAutoTest::WriteStatus(bool inGame)
            << ",\"zoneInfo\":\"" << [] { CPlayerPed* me = FindPlayerPed(0); CVector pos = me ? me->GetPosition() : CVector(); CZoneInfo* info = CTheZones::GetZoneInfo(&pos, nullptr); std::ostringstream o; o << std::hex << (uintptr_t)info << std::dec << " count " << *(int16_t*)0xBA1DE8 << " gangs"; for (int g = 0; info && g < 10; g++) o << " " << (int)(uint8_t)info->m_nGangDensity[g]; return o.str(); }() << "\""
            << ",\"missionBlockScripts\":\"" << [] { std::string s; const uint8_t* block = (const uint8_t*)CTheScripts::ScriptSpace + 200000; for (CRunningScript* r = CTheScripts::pActiveScripts; r; r = r->m_pNext) if (r->m_bIsMission || (r->m_pCurrentIP >= block && r->m_pCurrentIP < block + 69000)) { s += std::string(r->m_szName, strnlen(r->m_szName, 8)) + (r->m_bIsMission ? "(m) " : " "); } return s; }() << "\""
            << ",\"pools\":{\"colModel\":" << (CPools::ms_pColModelPool ? CPools::ms_pColModelPool->GetNoOfUsedSpaces() : -1) << ",\"colModelSize\":" << (CPools::ms_pColModelPool ? CPools::ms_pColModelPool->m_nSize : -1) << ",\"ped\":" << CPools::ms_pPedPool->GetNoOfUsedSpaces() << ",\"vehicle\":" << CPools::ms_pVehiclePool->GetNoOfUsedSpaces() << ",\"object\":" << CPools::ms_pObjectPool->GetNoOfUsedSpaces() << ",\"building\":" << CPools::ms_pBuildingPool->GetNoOfUsedSpaces() << "}"
+           << ",\"collectibles\":{\"horseshoes\":" << CStats::GetStatValue(STAT_HORSESHOES_COLLECTED)
+           << ",\"oysters\":" << CStats::GetStatValue(STAT_OYSTERS_COLLECTED) << ",\"snapshots\":" << CStats::GetStatValue(STAT_SNAPSHOTS_TAKEN)
+           << ",\"tags\":" << CStats::GetStatValue(STAT_TAGS_SPRAYED) << ",\"pickups953\":" << CountPickups(953)
+           << ",\"pickups954\":" << CountPickups(954) << ",\"pickups1253\":" << CountPickups(1253) << "}"
            << ",\"minigame\":" << (CTheScripts::bMiniGameInProgress ? "true" : "false")
            << ",\"coopUs\":{\"net\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::NET] << ",\"process\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PROCESS] << ",\"draw\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::DRAW] << ",\"autotest\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::AUTOTEST] << ",\"peds\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PEDS] << ",\"vehicles\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::VEHICLES] << ",\"tags\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::TAGS] << ",\"chatAndRest\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::CHAT] << ",\"playerList\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::PLAYERLIST] << ",\"checkpoint\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::CHECKPOINT] << ",\"input\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::INPUT] << ",\"version\":" << (int)CCoopPerf::ms_aLastUs[CCoopPerf::VERSION] << "}"
            << ",\"widescreen\":" << (TheCamera.m_bWideScreenOn ? "true" : "false")
@@ -1122,6 +1137,30 @@ void CAutoTest::Execute(const std::string& line)
                 count++;
         }
         result = "count=" + std::to_string(count);
+    }
+    else if (verb == "nearpickup")
+    {
+        // nearpickup <model>: the nearest pickup of that model still in the world; result = "x y z type"
+        int model = 0;
+        in >> model;
+        float best = 1e9f;
+        CVector bestPos;
+        int bestType = -1;
+        for (int i = 0; i < MAX_NUM_PICKUPS; i++)
+        {
+            CPickup& p = CPickups::aPickUps[i];
+            if (p.m_nPickupType == PICKUP_NONE || p.m_nModelIndex != model || p.m_nFlags.bDisabled)
+                continue;
+            float d = (p.GetPosn() - player->GetPosition()).Magnitude();
+            if (d < best)
+            {
+                best = d;
+                bestPos = p.GetPosn();
+                bestType = p.m_nPickupType;
+            }
+        }
+        result = bestType < 0 ? "none" : std::to_string(bestPos.x) + " " + std::to_string(bestPos.y) + " " +
+                                             std::to_string(bestPos.z) + " " + std::to_string(bestType);
     }
     else if (verb == "pickup")
     {

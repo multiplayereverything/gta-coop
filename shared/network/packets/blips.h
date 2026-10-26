@@ -406,4 +406,26 @@ private:
         return true;
     }
 };
+// a player collected an oyster, horseshoe or snapshot (collector -> everyone, the server adds who)
+class CollectibleCollected : public Packet
+{
+    DEFINE_PACKET_TYPE(CollectibleCollected, ePacketType::COLLECTIBLE_COLLECTED, ePacketChannel::SCRIPT);
+
+public:
+    SenderPlayerId senderPlayerid{};
+    uint16_t model = 0;
+    CVector position{};
+
+private:
+    template <typename Stream>
+    bool Serialize(Stream& stream)
+    {
+        serialize_object(stream, senderPlayerid);
+        serialize_bits(stream, model, 16);
+        serialize_float(stream, position.x);
+        serialize_float(stream, position.y);
+        serialize_float(stream, position.z);
+        return true;
+    }
+};
 }  // namespace Packets::Blips

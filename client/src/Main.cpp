@@ -46,6 +46,7 @@
 #include "CSaveSync.h"
 #include "CUserTrackSync.h"
 #include "CGangZoneSync.h"
+#include "CCollectibleSync.h"
 #include "CCrashLog.h"
 
 unsigned int lastOnFootSyncTickRate = 0;
@@ -260,6 +261,7 @@ public:
                 CNetworkVehicleManager::ProcessSmoothing();
                 CNetworkVehicleManager::ProcessPassengerRadio();
                 CGangZoneSync::Process();
+                CCollectibleSync::Process();
 
                 static uint32_t crashHotkeyPressedAt = 0;
 
