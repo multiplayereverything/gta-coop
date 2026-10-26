@@ -8,4 +8,5 @@ class CMissionPartnerVehicles
 {
 public:
     static void Process();
+    static bool IsExtraVehicle(CVehicle* vehicle);  // one of the copies spawned for partners (host)
 };

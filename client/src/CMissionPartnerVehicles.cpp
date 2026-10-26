@@ -81,6 +81,7 @@ static void SpawnFor(CVehicle* vehicle, int count)
         extra.handle = handle;
         Command<Commands::ADD_BLIP_FOR_CAR>(handle, &extra.blip);
         Command<Commands::SET_BLIP_AS_FRIENDLY>(extra.blip, 1);
+        Command<Commands::CHANGE_BLIP_COLOUR>(extra.blip, 1);  // green: friendly alone is blue, like the mission car itself
         ms_extraVehicles.push_back(extra);
     }
     Command<Commands::MARK_MODEL_AS_NO_LONGER_NEEDED>(model);
@@ -107,6 +108,7 @@ static void UpdateBlips()
         {
             Command<Commands::ADD_BLIP_FOR_CAR>(extra.handle, &extra.blip);
             Command<Commands::SET_BLIP_AS_FRIENDLY>(extra.blip, 1);
+            Command<Commands::CHANGE_BLIP_COLOUR>(extra.blip, 1);
         }
     }
 }
@@ -176,4 +178,12 @@ void CMissionPartnerVehicles::Process()
     needed = VMIN(needed, MAX_EXTRA_VEHICLES - (int)ms_extraVehicles.size());
     if (needed > 0)
         SpawnFor(vehicle, needed);
+}
+
+bool CMissionPartnerVehicles::IsExtraVehicle(CVehicle* vehicle)
+{
+    for (SExtraVehicle& extra : ms_extraVehicles)
+        if (vehicle && CPools::GetVehicle(extra.handle) == vehicle)
+            return true;
+    return false;
 }

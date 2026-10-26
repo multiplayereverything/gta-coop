@@ -13,6 +13,7 @@
 #include "CSaveSync.h"
 #include "CUserTrackSync.h"
 #include "CPlaytestReport.h"
+#include "CMissionPartnerVehicles.h"
 #include <game_sa/CTagManager.h>
 #include <CStats.h>
 #include <CTheZones.h>
@@ -1215,7 +1216,11 @@ void CAutoTest::Execute(const std::string& line)
             if (away.Magnitude() < 0.1f)
                 away = CVector(1.0f, 0.0f, 0.0f);
             away.Normalise();
-            player->Teleport(CVector(t.x + away.x * 1.8f, t.y + away.y * 1.8f, t.z), false);
+            CVector spot(t.x + away.x * 1.8f, t.y + away.y * 1.8f, t.z);
+            if (player->m_nPedFlags.bInVehicle && player->m_pVehicle)  // spraying is done on foot
+                Command<Commands::WARP_CHAR_FROM_CAR_TO_COORD>(CPools::GetPedRef(player), spot.x, spot.y, spot.z);
+            else
+                player->Teleport(spot, false);
             CTagManager::SetAlpha(best->m_pEntity, 255);
             Packets::World::TagUpdate packet{};
             packet.payload.bFullySprayed = true;
@@ -1487,6 +1492,10 @@ void CAutoTest::Execute(const std::string& line)
         {
             CVehicle* v = CPools::ms_pVehiclePool->GetAt(i);
             if (!v || v->m_nCreatedBy != eVehicleCreatedBy::MISSION_VEHICLE || v->m_pDriver)
+                continue;
+            // the host drives the mission's own vehicle, not a copy spawned for partners (it took Ryder's copy once and
+            // the mission waited for it to get back in its car)
+            if (CLocalPlayer::m_bIsHost && CMissionPartnerVehicles::IsExtraVehicle(v))
                 continue;
             float d = (v->GetPosition() - player->GetPosition()).Magnitude();
             int ref = CPools::GetVehicleRef(v);
