@@ -406,8 +406,39 @@ void CamShakeNoPos_Hook(CCamera* pCamera, float a2)
     }
 }
 
+// CClothes::RebuildPlayer(ped, bIgnoreFatAndMuscle) with false recomputes fat/muscle from the LOCAL stats; on
+// another player's CJ that also left its skeleton collapsed (every bone at the hip, measured with coop-anything's
+// animcheck, testing/anim-sync.ps1). The game calls it from 16 places (and for other players' CJs too, since
+// their ProcessControl runs as that player), so it is wrapped at its entry: anyone but the local player keeps
+// the body values their own game sent.
+static bool __cdecl RebuildPlayer_KeepOtherPlayersBody(CPlayerPed* ped)
+{
+    return ped && ped != FindPlayerPed(0);
+}
+
+static void __declspec(naked) CClothes__RebuildPlayer_Hook()
+{
+    __asm
+    {
+        mov eax, [esp + 4]
+        push eax
+        call RebuildPlayer_KeepOtherPlayersBody
+        add esp, 4
+        test al, al
+        jz original
+        mov byte ptr [esp + 8], 1
+    original:
+        push esi                // the 5 bytes the jump replaced: push esi; mov esi, [esp+8]
+        mov esi, [esp + 8]
+        push 0x5A82C5
+        ret
+    }
+}
+
 void PlayerHooks::InjectHooks()
 {
+    if (patch::GetUInt(0x5A82C0) == 0x24748B56 && *(uint8_t*)0x5A82C4 == 0x08)  // 56 8B 74 24 08, unmodified
+        patch::RedirectJump(0x5A82C0, CClothes__RebuildPlayer_Hook);
     patch::SetPointer(0x86D190, CPlayerPed__ProcessControl_Hook);
 
     patch::RedirectCall(0x73CD92, CWeapon__DoBulletImpact_Hook);
