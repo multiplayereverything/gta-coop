@@ -623,8 +623,9 @@ static void WriteProbeActor(std::ostringstream& o, CPed* ped, uint32_t ref)
     CVector p = ped->GetPosition();
     bool inCar = ped->m_nPedFlags.bInVehicle && ped->m_pVehicle;
     bool dead = ped->m_fHealth <= 0.0f || ped->m_ePedState == PEDSTATE_DIE || ped->m_ePedState == PEDSTATE_DEAD;
-    // hidden (cutscene) or seated in a car: animcheck skips the body checks, position is still compared
-    bool valid = ped->m_pRwClump && ped->m_bIsVisible && !inCar;
+    // off screen (the game does not animate it, its bones collapse), hidden (cutscene) or seated in a car:
+    // animcheck skips the body checks, position is still compared
+    bool valid = ped->m_pRwClump && ped->m_bIsVisible && !inCar && ped->GetIsOnScreen();
     o << "{\"ref\":" << ref << ",\"player\":true,\"pos\":[" << p.x << "," << p.y << "," << p.z << "],\"rot\":[0,0,"
       << ped->GetHeading() << "],\"cell\":" << (int)ped->m_nAreaCode << ",\"dead\":" << (dead ? "true" : "false")
       << ",\"valid3d\":" << (valid ? "true" : "false") << ",\"weapon\":{\"out\":"
@@ -648,12 +649,24 @@ static void WriteProbeActor(std::ostringstream& o, CPed* ped, uint32_t ref)
             o << ",\"state\":1,\"weight\":" << a->m_fBlendAmount << "}";
             first = false;
         }
-        o << "]},\"bones\":{";
+        o << "]},\"skel\":{\"preRender\":" << (int)ped->m_nPedFlags.bCalledPreRender;
+        if (RpHAnimHierarchy* h = GetAnimHierarchyFromSkinClump(ped->m_pRwClump))
+        {
+            // diagnostic: the hierarchy's own matrices after an update, next to GetBonePosition below
+            ped->UpdateRpHAnim();
+            for (unsigned id : {2u, 8u, 35u})
+            {
+                int i = RpHAnimIDGetIndex(h, id);
+                RwV3d m = i >= 0 ? h->pMatrixArray[i].pos : RwV3d{};
+                o << ",\"m" << id << "\":[" << m.x << "," << m.y << "," << m.z << "]";
+            }
+        }
+        o << "},\"bones\":{";
         first = true;
         for (auto& [name, id] : bones)
         {
             RwV3d b{};
-            ped->GetBonePosition(b, id, false);
+            ped->GetBonePosition(b, id, true);  // true: without a skin update every bone read as the root
             o << (first ? "" : ",") << "\"" << name << "\":[" << b.x << "," << b.y << "," << b.z << "]";
             first = false;
         }
@@ -1231,6 +1244,26 @@ void CAutoTest::Execute(const std::string& line)
         in >> slot;
         CSaveSync::SaveFromCommand(slot);
         result = CSaveSync::SlotPath(slot);
+    }
+    else if (verb == "face")
+    {
+        // face <x> <y> <z>: turn the player toward a point, camera behind (keeps another player on screen in tests)
+        float x = 0, y = 0, z = 0;
+        in >> x >> y >> z;
+        CVector p = player->GetPosition();
+        float heading = atan2f(-(x - p.x), y - p.y);
+        player->m_fCurrentRotation = player->m_fAimingRotation = heading;
+        player->SetHeading(heading);
+        Command<Commands::SET_CAMERA_BEHIND_PLAYER>();
+    }
+    else if (verb == "clothes")
+    {
+        // clothes <texture> <model> <bodypart>: put clothes on CJ like a mission does (e.g. BBSHORTWHT BOXINGSHORT 2)
+        std::string tex, model;
+        int part = 0;
+        in >> tex >> model >> part;
+        Command<Commands::GIVE_PLAYER_CLOTHES_OUTSIDE_SHOP>(0, tex.c_str(), model.c_str(), part);
+        Command<Commands::BUILD_PLAYER_MODEL>(0);
     }
     else if (verb == "lookfrom")
     {

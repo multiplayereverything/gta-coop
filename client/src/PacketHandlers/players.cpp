@@ -252,7 +252,7 @@ PACKET_HANDLER(ePacketType::REBUILD_PLAYER, Packets::Players::RebuildPlayer* pRe
             *pPlayerPed->m_pPlayerData->m_pPedClothesDesc = pRebuildPlayer->clothesDesc;
             if (pPlayerPed->m_pRwClump)
             {
-                CClothes::RebuildPlayer(pPlayerPed, false);
+                CClothes::RebuildPlayer(pPlayerPed, true);  // their fat/muscle, not ours (see CNetworkPlayer::CreatePed)
             }
         }
 

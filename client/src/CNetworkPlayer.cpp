@@ -47,7 +47,9 @@ void CNetworkPlayer::CreatePed(CVector position)
 
     *m_pPed->m_pPlayerData->m_pPedClothesDesc = m_pPedClothesDesc;
 
-    CClothes::RebuildPlayer(m_pPed, false);
+    // true: keep this player's own fat/muscle from the clothes desc; false recomputed them from OUR stats, so
+    // every other player had the local player's body (found with coop-anything animcheck, testing/anim-sync.ps1)
+    CClothes::RebuildPlayer(m_pPed, true);
 
     // THIS IS AN EXPERIMENTAL SOLUTION FOR THE 0x4D68BA CRASH
     m_pPed->m_bStreamingDontDelete = true;

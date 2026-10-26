@@ -149,22 +149,24 @@ public:
 
 struct CControllerStateCompressed : public CControllerState
 {
-#define serialize_stick(stream, value)               \
-    do                                               \
-    {                                                \
-        int16_t temp = 0;                             \
-                                                     \
-        if (Stream::IsWriting)                       \
-        {                                            \
-            temp = std::clamp<int16_t>(value, -1, 1); \
-        }                                            \
-                                                     \
-        serialize_int(stream, temp, -1, 1);          \
-                                                     \
-        if (Stream::IsReading)                       \
-        {                                            \
-            value = temp * 128;                      \
-        }                                            \
+// the full stick range: squeezing it to -1/0/1 (x128) turned a half-tilted stick (walking) into a full one, so
+// others saw a controller player run while they walked (found with coop-anything's animcheck, testing/anim-sync.ps1)
+#define serialize_stick(stream, value)                    \
+    do                                                    \
+    {                                                     \
+        int32_t temp = 0;                                 \
+                                                          \
+        if (Stream::IsWriting)                            \
+        {                                                 \
+            temp = std::clamp<int32_t>(value, -128, 128); \
+        }                                                 \
+                                                          \
+        serialize_int(stream, temp, -128, 128);           \
+                                                          \
+        if (Stream::IsReading)                            \
+        {                                                 \
+            value = (signed short)temp;                   \
+        }                                                 \
     } while (false)
 
 #define serialize_bool_key(stream, key)   \
