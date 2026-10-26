@@ -323,12 +323,17 @@ static std::string Vec(const CVector& v)
 static CRunningScript* FindMissionScript()
 {
     const uint8_t* missionBlock = (const uint8_t*)CTheScripts::ScriptSpace + 200000;
+    // the mission thread itself first: a helper thread it started (no name, e.g. in Deconstruction) came first in the
+    // list, so passmission jumped the helper and the mission never passed
+    for (CRunningScript* s = CTheScripts::pActiveScripts; s; s = s->m_pNext)
+        if (s->m_bIsMission && strncmp(s->m_szName, "coopand", 7) != 0)
+            return s;
     for (CRunningScript* s = CTheScripts::pActiveScripts; s; s = s->m_pNext)
     {
         if (strncmp(s->m_szName, "coopand", 7) == 0)
             continue;
         // also helper threads a mission started: they run code inside the mission block (their base may be elsewhere)
-        if (s->m_bIsMission || (s->m_pBaseIP >= missionBlock && s->m_pBaseIP < missionBlock + 69000) ||
+        if ((s->m_pBaseIP >= missionBlock && s->m_pBaseIP < missionBlock + 69000) ||
             (s->m_pCurrentIP >= missionBlock && s->m_pCurrentIP < missionBlock + 69000))
             return s;
     }
@@ -1137,6 +1142,40 @@ void CAutoTest::Execute(const std::string& line)
                 count++;
         }
         result = "count=" + std::to_string(count);
+    }
+    else if (verb == "recruit")
+    {
+        // recruit: a Grove Street member (fam1) next to the player joins the player's group, like recruiting in play;
+        // result = how many members the group has now
+        Command<Commands::REQUEST_MODEL>(105);
+        Command<Commands::LOAD_ALL_MODELS_NOW>();
+        CVector p = player->GetPosition();
+        int ped = 0, group = 0, leaders = 0, members = 0;
+        Command<Commands::CREATE_CHAR>(8, 105, p.x + 2.0f, p.y, p.z, &ped);  // 8 = PEDTYPE_GANG2, Grove
+        Command<Commands::GET_PLAYER_GROUP>(0, &group);
+        Command<Commands::SET_GROUP_MEMBER>(group, ped);
+        Command<Commands::MARK_MODEL_AS_NO_LONGER_NEEDED>(105);
+        Command<Commands::GET_GROUP_SIZE>(group, &leaders, &members);
+        result = "members=" + std::to_string(members);
+    }
+    else if (verb == "countnear")
+    {
+        // countnear <model> <radius>: peds of that model near me and near each other player, as this game sees them
+        int model = 0;
+        float radius = 10.0f;
+        in >> model >> radius;
+        auto count = [&](CVector c) {
+            int n = 0;
+            for (int i = 0; i < CPools::ms_pPedPool->m_nSize; i++)
+                if (CPed* ped = CPools::ms_pPedPool->GetAt(i))
+                    if (ped->m_nModelIndex == model && !ped->IsPlayer() && (ped->GetPosition() - c).Magnitude() < radius)
+                        n++;
+            return n;
+        };
+        result = "me=" + std::to_string(count(player->GetPosition()));
+        for (CNetworkPlayer* np : CNetworkPlayerManager::m_pPlayers)
+            if (np->m_pPed)
+                result += " p" + std::to_string(np->m_playerId.value()) + "=" + std::to_string(count(np->m_pPed->GetPosition()));
     }
     else if (verb == "nearpickup")
     {

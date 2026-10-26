@@ -157,6 +157,17 @@ public:
                     packet.bOnMission = CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag];
                     GetPacketFactory().Send(packet);
                 }
+                // repeated during a mission: a player who joins (or rejoins) mid-mission only heard of changes before
+                // and stayed outside the mission (testing/rejoin.ps1); a repeat changes nothing for the others
+                static uint32_t lastOnMissionRepeat = 0;
+                if (CLocalPlayer::m_bIsHost && CTheScripts::OnAMissionFlag && lastOnMissionFlag &&
+                    GetTickCount() - lastOnMissionRepeat > 5000)
+                {
+                    lastOnMissionRepeat = GetTickCount();
+                    Packets::Scripts::OnMissionFlagSync packet{};
+                    packet.bOnMission = true;
+                    GetPacketFactory().Send(packet);
+                }
 
                 unsigned int tickCount = GetTickCount();
 

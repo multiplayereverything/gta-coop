@@ -138,6 +138,23 @@ void CNetwork::HandlePlayerConnected(ENetPeer* pENetPeer, Packets::System::Playe
     {
         if (strncmp(pNetworkPlayer->m_Name, playerConnected.payload.name, sizeof(pNetworkPlayer->m_Name)) == 0)
         {
+            // the same player back after their game was closed hard: the old session lingers until the 30-60 s
+            // timeout and they could not join again (testing/rejoin.ps1). Same address and the old one silent for
+            // 3 s (a live game answers every half second; a second player behind the same router keeps theirs):
+            // end the old session now and let them in.
+            ENetPeer* oldPeer = pNetworkPlayer->m_pPeer;
+            if (oldPeer && oldPeer != pENetPeer && oldPeer->address.host == pENetPeer->address.host &&
+                (int32_t)(enet_time_get() - oldPeer->lastReceiveTime) > 3000)
+            {
+                printf("[Game] : %s is back, the old session (silent) is closed.\n", pNetworkPlayer->m_Name);
+                ENetEvent oldEvent{};
+                oldEvent.type = ENET_EVENT_TYPE_DISCONNECT;
+                oldEvent.peer = oldPeer;
+                HandlePlayerDisconnected(oldEvent);
+                enet_peer_reset(oldPeer);
+                break;
+            }
+
             Packets::System::PlayerDisconnected playerDisconnected{};
             playerDisconnected.payload.playerid = -1;
             playerDisconnected.payload.reason = Packets::System::PlayerDisconnected::DISCONNECTION_REASON_NAME_TAKEN;
