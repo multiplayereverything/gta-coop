@@ -1,5 +1,7 @@
 :HELP
 script_name 'HELP'
+// coop: the hospital and police station tips only show the help text - their scene (no control, widescreen, fixed
+// camera for 24 s) got players stuck when several respawned there together
 
 :HELP_11
 wait 70
@@ -18,12 +20,8 @@ goto_if_false @HELP_259
 if 
   Player.IsPlaying($player1)
 goto_if_false @HELP_110
-Player.SetControl($player1, False)
-Hud.SwitchWidescreen(True)
 
 :HELP_110
-Camera.SetFixedPosition(2022.613, -1432.05, 17.6541, 0.0, 0.0, 0.0)
-Camera.PointAtPoint(2022.989, -1431.124, 17.6552, SwitchType.JumpCut)
 Pickup.Remove($wasted_help1)
 Pickup.Remove($wasted_help2)
 Text.ClearHelp
@@ -35,12 +33,9 @@ Text.PrintHelpForever('HOSP_3')
 wait 8000
 Text.ClearHelp
 $wasted_help = 1
-Camera.RestoreJumpcut
 if 
   Player.IsPlaying($player1)
 goto_if_false @HELP_259
-Player.SetControl($player1, True)
-Hud.SwitchWidescreen(False)
 
 :HELP_259
 if 
@@ -49,12 +44,8 @@ goto_if_false @HELP_451
 if 
   Player.IsPlaying($player1)
 goto_if_false @HELP_302
-Player.SetControl($player1, False)
-Hud.SwitchWidescreen(True)
 
 :HELP_302
-Camera.SetFixedPosition(1184.347, -1313.489, 19.7079, 0.0, 0.0, 0.0)
-Camera.PointAtPoint(1183.645, -1314.089, 19.3248, SwitchType.JumpCut)
 Pickup.Remove($wasted_help1)
 Pickup.Remove($wasted_help2)
 Text.ClearHelp
@@ -65,12 +56,9 @@ wait 8000
 Text.PrintHelpForever('HOSP_3')
 wait 8000
 Text.ClearHelp
-Camera.RestoreJumpcut
 if 
   Player.IsPlaying($player1)
 goto_if_false @HELP_444
-Player.SetControl($player1, True)
-Hud.SwitchWidescreen(False)
 
 :HELP_444
 $wasted_help = 1
@@ -85,12 +73,8 @@ goto_if_false @HELP_672
 if 
   Player.IsPlaying($player1)
 goto_if_false @HELP_512
-Player.SetControl($player1, False)
-Hud.SwitchWidescreen(True)
 
 :HELP_512
-Camera.SetFixedPosition(1536.577, -1687.134, 26.7069, 0.0, 0.0, 0.0)
-Camera.PointAtPoint(1537.295, -1686.564, 26.3081, SwitchType.JumpCut)
 Pickup.Remove($busted_help1)
 Text.ClearHelp
 Text.PrintHelpForever('BUST_1')
@@ -102,12 +86,9 @@ wait 8000
 Text.PrintHelpForever('BUST_4')
 wait 8000
 Text.ClearHelp
-Camera.RestoreJumpcut
 if 
   Player.IsPlaying($player1)
 goto_if_false @HELP_665
-Player.SetControl($player1, True)
-Hud.SwitchWidescreen(False)
 
 :HELP_665
 $busted_help = 1

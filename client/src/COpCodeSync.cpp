@@ -293,6 +293,14 @@ static bool IsUnportedMissionScript(CRunningScript* script)
     return script && script->m_bIsMission && strncmp(script->m_szName, "coopand", 7) != 0;
 }
 
+// phone calls (MOB_LA1, MOB_GF, ... started by the host's missions): their ring and voice lines already reach everyone
+// (MissionAudioHooks); the subtitles of the call go along too, so every player follows the call
+static bool IsPhoneCallSubtitle(CRunningScript* script, int opcode)
+{
+    return script && _strnicmp(script->m_szName, "mob_", 4) == 0 &&
+           (opcode == 0x00BB || opcode == 0x00BC || opcode == 0x00BE || opcode == 0x054C);
+}
+
 /// <param name="opcodeIdx">syncedOpcodes index</param>
 bool COpCodeSync::IsOpcodeSyncable(int opcode, int* opcodeIdx, bool ignoreOpCodeSync)
 {
@@ -308,7 +316,8 @@ bool COpCodeSync::IsOpcodeSyncable(int opcode, int* opcodeIdx, bool ignoreOpCode
     }
 
     bool bUnportedFallback = CLocalPlayer::m_bIsHost && ms_bSyncingEnabled && !bScriptSynced &&
-                             IsUnportedMissionScript(lastProcessedScript) && IsUnportedMissionFallbackOpcode(opcode);
+                             ((IsUnportedMissionScript(lastProcessedScript) && IsUnportedMissionFallbackOpcode(opcode)) ||
+                              IsPhoneCallSubtitle(lastProcessedScript, opcode));
 
     if (((CLocalPlayer::m_bIsHost && ms_bSyncingEnabled) && bScriptSynced) || ignoreOpCodeSync || bUnportedFallback ||
         CTaskSequenceSync::IsOpCodeTaskSynced((eScriptCommands)opcode))

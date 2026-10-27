@@ -90,8 +90,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,0,0,0
- PRODUCTVERSION 1,0,0,0
+ FILEVERSION 1,0,1,0
+ PRODUCTVERSION 1,0,1,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -108,12 +108,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Tornamic"
             VALUE "FileDescription", "Cooperative Multiplayer for GTA:SA"
-            VALUE "FileVersion", "1.0.0"
+            VALUE "FileVersion", "1.0.1"
             VALUE "InternalName", "CoopAndreas"
             VALUE "LegalCopyright", "Tornamic (C) 2026"
             VALUE "OriginalFilename", "LaunchCoopAndreas.exe"
             VALUE "ProductName", "CoopAndreas"
-            VALUE "ProductVersion", "1.0.0"
+            VALUE "ProductVersion", "1.0.1"
         END
     END
     BLOCK "VarFileInfo"

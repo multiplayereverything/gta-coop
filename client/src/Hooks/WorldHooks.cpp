@@ -177,8 +177,6 @@ static bool __fastcall CEntryExit__TransitionFinished_Hook(CEntryExit* This, SKI
     return result;
 }
 
-static int calls = 0;
-static int SprayPaintWorld_LastCalled = 0;
 static uint8_t LastTagAlpha = 0;
 static CEntity* LastTagEntity = nullptr;
 int CWorld__SprayPaintWorld_Hook(CVector* posn, CVector* outDir, float radius, bool processTagAlphaState)
@@ -195,40 +193,41 @@ int CWorld__SprayPaintWorld_Hook(CVector* posn, CVector* outDir, float radius, b
         }
     }
 
+    // which tags this spray changed: compare every tag's alpha before and after. (It used to send the tag remembered by
+    // the last SetAlpha call, which could be another tag than the one sprayed, or none at all.)
+    uint8_t before[ARRAY_SIZE(CTagManager::ms_tagDesc)];
+    for (size_t i = 0; i < ARRAY_SIZE(CTagManager::ms_tagDesc); i++)
+        before[i] = CTagManager::ms_tagDesc[i].m_nAlpha;
+
     int result = CWorld::SprayPaintWorld(*posn, *outDir, radius, processTagAlphaState);
-    if (result == 1 && LastTagAlpha != 255)
-    {
-        /*CChat::AddMessage("CWorld__SprayPaintWorld_Hook posn {%f %f %f} outDir {%f %f %f} radius %f
-           processTagAlphaState %d", posn->x, posn->y, posn->y, outDir->x, outDir->y, outDir->y, radius,
-           processTagAlphaState);*/
-        int tickCount = GetTickCount();
-        if (tickCount > SprayPaintWorld_LastCalled + 150)
-        {
-            // CChat::AddMessage("1 %d %d", ++calls, LastTagAlpha);
-            SprayPaintWorld_LastCalled = tickCount;
+    WorldHooks::SendChangedTags(before);
+    return result;
+}
 
-            Packets::World::TagUpdate packet{};
-            packet.payload.bFullySprayed = false;
-            packet.payload.alpha = LastTagAlpha;
-            packet.payload.pos_x = static_cast<int16_t>(floor(LastTagEntity->GetPosition().x));
-            packet.payload.pos_y = static_cast<int16_t>(floor(LastTagEntity->GetPosition().y));
-            packet.payload.pos_z = static_cast<int16_t>(floor(LastTagEntity->GetPosition().z));
-            GetPacketFactory().Send(packet);
-        }
-    }
-
-    if (result == 2)
+void WorldHooks::SendChangedTags(const uint8_t* before)
+{
+    static uint32_t lastPartialSent[ARRAY_SIZE(CTagManager::ms_tagDesc)]{};
+    uint32_t now = GetTickCount();
+    for (size_t i = 0; i < ARRAY_SIZE(CTagManager::ms_tagDesc); i++)
     {
-        // CChat::AddMessage("2 %d %d", ++calls, LastTagAlpha);
+        auto& tag = CTagManager::ms_tagDesc[i];
+        if (!tag.m_pEntity || tag.m_nAlpha <= before[i])
+            continue;
+
+        bool full = tag.m_nAlpha == 255;
+        // a partial update at most every 150 ms per tag; the finished tag always (it is what missions count)
+        if (!full && now - lastPartialSent[i] < 150)
+            continue;
+        lastPartialSent[i] = now;
+
         Packets::World::TagUpdate packet{};
-        packet.payload.bFullySprayed = true;
-        packet.payload.alpha = LastTagAlpha;
-        packet.payload.pos_x = static_cast<int16_t>(floor(LastTagEntity->GetPosition().x));
-        packet.payload.pos_y = static_cast<int16_t>(floor(LastTagEntity->GetPosition().y));
-        packet.payload.pos_z = static_cast<int16_t>(floor(LastTagEntity->GetPosition().z));
+        packet.payload.bFullySprayed = full;
+        packet.payload.alpha = tag.m_nAlpha;
+        packet.payload.pos_x = static_cast<int16_t>(floor(tag.m_pEntity->GetPosition().x));
+        packet.payload.pos_y = static_cast<int16_t>(floor(tag.m_pEntity->GetPosition().y));
+        packet.payload.pos_z = static_cast<int16_t>(floor(tag.m_pEntity->GetPosition().z));
         GetPacketFactory().Send(packet);
     }
-    return result;
 }
 
 void CTagManager__SetAlpha_Hook(CEntity* entity, uint8_t alpha)

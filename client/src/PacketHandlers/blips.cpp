@@ -10,6 +10,8 @@
 #include "CUserTrackSync.h"
 #include "CCollectibleSync.h"
 #include "CAutoTest.h"
+#include "CMissionStartSync.h"
+#include "CChatCommands.h"
 #include "CGangZoneSync.h"
 
 PACKET_HANDLER(ePacketType::UPDATE_CHECKPOINT, Packets::Blips::UpdateCheckpoint* pUpdateCheckpoint)
@@ -128,4 +130,14 @@ PACKET_HANDLER(ePacketType::PLAYER_CONNECTION_STATE, Packets::Blips::PlayerConne
 		CAutoTest::Event(pPlayerConnectionState->lost ? "player_connection_lost" : "player_connection_back",
 			"\"id\":" + std::to_string(pNetworkPlayer->m_playerId.value()));
 	}
+}
+
+PACKET_HANDLER(ePacketType::MISSION_START_REQUEST, Packets::Blips::MissionStartRequest* pMissionStartRequest)
+{
+	CMissionStartSync::HandleRequest(*pMissionStartRequest);
+}
+
+PACKET_HANDLER(ePacketType::TELEPORT_PLAYER_REQUEST, Packets::Blips::TeleportPlayerRequest* pTeleportPlayerRequest)
+{
+	CChatCommands::HandleTeleportRequest(*pTeleportPlayerRequest);
 }

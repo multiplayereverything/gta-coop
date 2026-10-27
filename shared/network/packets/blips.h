@@ -447,4 +447,57 @@ private:
         return true;
     }
 };
+// a player asks the host's game to start a story mission (chat /mission, or a partner whose contact script reached a
+// mission launch): the host runs every mission, so it is launched there (player -> server -> host)
+class MissionStartRequest : public Packet
+{
+    DEFINE_PACKET_TYPE(MissionStartRequest, ePacketType::MISSION_START_REQUEST, ePacketChannel::SCRIPT);
+
+public:
+    SenderPlayerId senderPlayerid{};
+    int16_t missionId = -1;
+    bool atMarker = false;  // started from a mission marker: the host is moved to `position` first
+    CVector position{};
+    uint8_t area = 0;
+
+private:
+    template <typename Stream>
+    bool Serialize(Stream& stream)
+    {
+        serialize_object(stream, senderPlayerid);
+        int32_t id = missionId;
+        serialize_int(stream, id, -1, 255);
+        missionId = (int16_t)id;
+        serialize_bool(stream, atMarker);
+        serialize_float(stream, position.x);
+        serialize_float(stream, position.y);
+        serialize_float(stream, position.z);
+        serialize_bits(stream, area, 8);
+        return true;
+    }
+};
+// chat /bring: move another player next to the sender (player -> server -> target)
+class TeleportPlayerRequest : public Packet
+{
+    DEFINE_PACKET_TYPE(TeleportPlayerRequest, ePacketType::TELEPORT_PLAYER_REQUEST, ePacketChannel::SCRIPT);
+
+public:
+    SenderPlayerId senderPlayerid{};
+    playerid_t target{};
+    CVector position{};
+    uint8_t area = 0;
+
+private:
+    template <typename Stream>
+    bool Serialize(Stream& stream)
+    {
+        serialize_object(stream, senderPlayerid);
+        serialize_playerid(stream, target);
+        serialize_float(stream, position.x);
+        serialize_float(stream, position.y);
+        serialize_float(stream, position.z);
+        serialize_bits(stream, area, 8);
+        return true;
+    }
+};
 }  // namespace Packets::Blips

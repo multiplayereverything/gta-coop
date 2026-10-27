@@ -128,3 +128,24 @@ PACKET_HANDLER(ePacketType::COLLECTIBLE_COLLECTED, Packets::Blips::CollectibleCo
     pCollectibleCollected->senderPlayerid = pNetworkPlayer->m_playerId;
     GetPacketFactory().SendToAll(*pCollectibleCollected, pNetworkPlayer);
 }
+
+// any player may ask for a story mission; the host's game runs it
+PACKET_HANDLER(ePacketType::MISSION_START_REQUEST, Packets::Blips::MissionStartRequest* pMissionStartRequest, CNetworkPlayer* pNetworkPlayer)
+{
+    pMissionStartRequest->senderPlayerid = pNetworkPlayer->m_playerId;
+    CNetworkPlayer* pHost = CNetworkPlayerManager::GetHost();
+    if (pHost && pHost != pNetworkPlayer)
+    {
+        GetPacketFactory().Send(*pMissionStartRequest, pHost);
+    }
+}
+
+PACKET_HANDLER(ePacketType::TELEPORT_PLAYER_REQUEST, Packets::Blips::TeleportPlayerRequest* pTeleportPlayerRequest, CNetworkPlayer* pNetworkPlayer)
+{
+    pTeleportPlayerRequest->senderPlayerid = pNetworkPlayer->m_playerId;
+    if (auto pTarget = CNetworkPlayerManager::GetPlayer(pTeleportPlayerRequest->target))
+    {
+        if (pTarget != pNetworkPlayer)
+            GetPacketFactory().Send(*pTeleportPlayerRequest, pTarget);
+    }
+}

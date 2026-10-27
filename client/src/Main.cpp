@@ -48,6 +48,8 @@
 #include "CGangZoneSync.h"
 #include "CCollectibleSync.h"
 #include "CCrashLog.h"
+#include "CChatCommands.h"
+#include "CMissionStartSync.h"
 
 unsigned int lastOnFootSyncTickRate = 0;
 unsigned int lastDriverSyncTickRate = 0;
@@ -273,6 +275,8 @@ public:
                 CNetworkVehicleManager::ProcessPassengerRadio();
                 CGangZoneSync::Process();
                 CCollectibleSync::Process();
+                CChatCommands::Process();
+                CMissionStartSync::Process();
 
                 static uint32_t crashHotkeyPressedAt = 0;
 

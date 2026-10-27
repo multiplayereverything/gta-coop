@@ -216,6 +216,48 @@ static void MeasureJitter(CNetworkPed* networkPed, double& sum, uint32_t& sample
     networkPed->m_bHasLastFrame = true;
 }
 
+// Shop scripts (BARB, TATTO, JFUD, PSHOP) run on every player's game and each creates the shopkeeper unless it finds
+// one already there; players walking in at about the same time still got one each (two barbers, one cutting). The
+// copy of another game's shopkeeper standing on this game's own one is hidden while both exist: everyone sees one
+// shopkeeper, and the one that serves them is their own script's (its haircut animations run on this game). A game
+// that has only copies there (a third player) shows the one of the player who joined first.
+void CNetworkPedManager::HideDuplicateShopkeeper(CNetworkPed* copy)
+{
+    CPed* ped = copy->m_pPed;
+    bool duplicate = false;
+    // shops are interiors (z ~1000); shopkeepers are script peds
+    if (ped->m_matrix && ped->GetPosition().z > 500.0f && copy->m_nCreatedBy == 2)
+    {
+        for (auto other : m_pPeds)
+        {
+            // this game's own one wins; between two copies (a third player watching), the older player's
+            CPed* own = other->m_pPed;
+            if (other == copy || !own || !own->m_matrix || own->m_nModelIndex != ped->m_nModelIndex ||
+                own->m_nCreatedBy != 2 || !own->m_bIsVisible)
+                continue;
+            if (!other->m_bSyncing && !(other->m_pedId.creator() < copy->m_pedId.creator()))
+                continue;
+            if ((own->GetPosition() - ped->GetPosition()).Magnitude() < 1.5f)
+            {
+                duplicate = true;
+                break;
+            }
+        }
+    }
+
+    if (duplicate && ped->m_bIsVisible)
+    {
+        ped->m_bIsVisible = false;
+        ped->m_bUsesCollision = false;
+        CAutoTest::Event("shopkeeper_duplicate_hidden", "\"model\":" + std::to_string(ped->m_nModelIndex));
+    }
+    else if (!duplicate && !ped->m_bIsVisible && !ped->m_bUsesCollision)
+    {
+        ped->m_bIsVisible = true;
+        ped->m_bUsesCollision = true;
+    }
+}
+
 void CNetworkPedManager::Process()
 {
     for (auto networkPed : m_pPeds)
@@ -230,6 +272,8 @@ void CNetworkPedManager::Process()
 
         if (ped == nullptr)
             continue;
+
+        HideDuplicateShopkeeper(networkPed);
 
         if (!ped->m_nPedFlags.bInVehicle)
         {
@@ -246,8 +290,10 @@ void CNetworkPedManager::Process()
                 CVector predicted = networkPed->m_vecSyncedPos + networkPed->m_vecVelocity * ahead;
                 CVector error = predicted - ped->GetPosition();
                 // height is left to the local ground collision/gravity (pulling it fought them: vertical jitter),
-                // unless it is clearly off (stairs, slopes the other game resolved differently)
-                if (fabs(error.z) < 1.0f)
+                // unless it is clearly off (stairs, slopes the other game resolved differently). A copy lower than
+                // the owner's is pulled up sooner: one that sank into the ground (no ground collision streamed here
+                // yet) was drawn half buried until it moved a metre
+                if (error.z > -1.0f && error.z < 0.35f)
                     error.z = 0.0f;
                 if (error.Magnitude() > 0.05f)
                 {

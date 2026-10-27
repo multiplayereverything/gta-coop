@@ -6,6 +6,7 @@
 #include <COpCodeSync.h>
 #include <CTaskSequenceSync.h>
 #include <CRadarSync.h>
+#include "CMissionStartSync.h"
 
 PACKET_HANDLER(ePacketType::ON_MISSION_FLAG_SYNC, Packets::Scripts::OnMissionFlagSync* pOnMissionFlagSync)
 {
@@ -16,6 +17,7 @@ PACKET_HANDLER(ePacketType::ON_MISSION_FLAG_SYNC, Packets::Scripts::OnMissionFla
 	{
         bool bWasOnMission = (bool)CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag];
 		CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag] = pOnMissionFlagSync->bOnMission;
+		CMissionStartSync::OnHostMissionFlag(pOnMissionFlagSync->bOnMission);
         if (bWasOnMission && pOnMissionFlagSync->bOnMission == false)
 		{
 			// cleanup

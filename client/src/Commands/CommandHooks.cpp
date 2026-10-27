@@ -3,6 +3,7 @@
 #include "CCustomCommandMgr.h"
 #include "Commands/CCommandAddChatMessage.h"
 #include "CAutoTest.h"
+#include "CMissionStartSync.h"
 
 uint16_t nCommand = 0x0;
 CRunningScript* pScript = nullptr;
@@ -26,6 +27,18 @@ bool ProcessCustomCommand()
 		}
 		pScript->UpdateCompareFlag(pressed);
 		return true;
+	}
+	// load_and_launch_mission_internal on a partner's game (its contact script saw this player in a mission marker):
+	// story missions run on the host's game, so ask the host instead of starting it here alone
+	if (commandNormalised == 0x0417 && !CLocalPlayer::m_bIsHost && CNetwork::m_bAuthenticated)
+	{
+		uint8_t* ip = pScript->m_pCurrentIP;
+		pScript->m_pCurrentIP += 2;
+		pScript->CollectParameters(1);
+		if (CMissionStartSync::InterceptScriptLaunch(pScript, ScriptParams[0]))
+			return true;
+		pScript->m_pCurrentIP = ip;  // not a story mission (side jobs, minigames): the game runs it as usual
+		return false;
 	}
 	if (commandNormalised >= CCustomCommandMgr::MIN_CUSTOM_COMMAND && commandNormalised <= CCustomCommandMgr::MAX_CUSTOM_COMMAND)
 	{

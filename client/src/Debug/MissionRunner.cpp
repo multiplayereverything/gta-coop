@@ -1,13 +1,10 @@
 #include "MissionRunner.h"
 #include <imgui.h>
+#include "CMissionStartSync.h"
 
 namespace
 {
-struct SMissionEntry
-{
-    const char* m_szName;
-    int m_nId;
-};
+using SMissionEntry = MissionRunner::SMissionEntry;
 
 constexpr SMissionEntry MISSIONS[] = {
     {"Big Smoke", 11},
@@ -116,11 +113,6 @@ const char* GetLaunchUnavailableReason()
         return "Connect and authenticate with a server to launch missions.";
     }
 
-    if (!CLocalPlayer::m_bIsHost)
-    {
-        return "Only the host can launch missions.";
-    }
-
     CPlayerPed* pPlayerPed = FindPlayerPed(0);
     if (!pPlayerPed)
     {
@@ -130,11 +122,6 @@ const char* GetLaunchUnavailableReason()
     if (CTheScripts::IsPlayerOnAMission() || CTheScripts::bAlreadyRunningAMissionScript)
     {
         return "A mission is already active.";
-    }
-
-    if (CGame::currArea != AREA_MAIN_MAP || pPlayerPed->m_nAreaCode != AREA_MAIN_MAP)
-    {
-        return "Missions can only be launched outside interiors.";
     }
 
     return nullptr;
@@ -163,7 +150,8 @@ bool MissionRunner::DrawUI()
 
         if (ImGui::Button(mission.m_szName, ImVec2(ImGui::GetContentRegionAvail().x, 0.0f)) && bValidMissionId)
         {
-            Command<Commands::LOAD_AND_LAUNCH_MISSION_INTERNAL>(mission.m_nId);
+            // the host launches it like a mission trigger does; a partner's request goes to the host
+            CMissionStartSync::Request(mission.m_nId);
             bMissionLaunched = true;
         }
 
@@ -178,4 +166,10 @@ bool MissionRunner::DrawUI()
     ImGui::EndChild();
     ImGui::End();
     return bMissionLaunched;
+}
+
+const MissionRunner::SMissionEntry* MissionRunner::GetMissions(int& count)
+{
+    count = (int)(sizeof(MISSIONS) / sizeof(MISSIONS[0]));
+    return MISSIONS;
 }

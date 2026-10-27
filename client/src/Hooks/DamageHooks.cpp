@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "DamageHooks.h"
+#include <CPedGroups.h>
 
 bool __fastcall CEventDamage__AffectsPed_Hook(CEventDamage* This, SKIP_EDX, CPed* pPed)
 {
@@ -8,6 +9,30 @@ bool __fastcall CEventDamage__AffectsPed_Hook(CEventDamage* This, SKIP_EDX, CPed
         return plugin::CallMethodAndReturn<bool, 0x4B35A0>(This, pPed);
     }
     return false;
+}
+
+static bool IsNetworkPlayerOrTheirVehicle(CEntity* entity);
+
+// CEventDamage::AffectsPed through the vtable (how the ped's event handler asks whether to react to being hit).
+// The health loss itself is applied before this and is unchanged; only the reaction is filtered:
+// - a synced copy of another game's NPC: that game's AI reacts and its position/health come over the network. A local
+//   reaction (fleeing, fighting back, cowering on the ground) only showed on this screen
+// - a mission character (Big Smoke, Sweet...) or one of our recruits hit by another player: in single player the
+//   mission's decision makers keep them from turning on the player, but they don't cover the other players, so a
+//   friend's stray shot or punch made them attack everyone
+static bool __fastcall CEventDamage__AffectsPed_VHook(CEventDamage* This, SKIP_EDX, CPed* pPed)
+{
+    if (CNetwork::m_bAuthenticated && pPed && !pPed->IsPlayer())
+    {
+        if (!CLocalPlayer::GetIsHostingEntity(pPed))
+            return false;
+
+        CEntity* source = *(CEntity**)((uintptr_t)This + 0x14);  // CEventDamage::m_pSourceEntity
+        if (IsNetworkPlayerOrTheirVehicle(source) &&
+            (pPed->m_nCreatedBy == 2 /* mission */ || CPedGroups::IsInPlayersGroup(pPed)))
+            return false;
+    }
+    return plugin::CallMethodAndReturn<bool, 0x4B35A0>(This, pPed);
 }
 
 static bool IsNetworkPlayerOrTheirVehicle(CEntity* entity)
@@ -124,6 +149,9 @@ void DamageHooks::InjectHooks()
     patch::RedirectCall(0x73BBE1, CObject__ObjectDamage_Hook);  // CWeapon::DoBulletImpact
     patch::RedirectCall(0x73BBFF, CObject__ObjectDamage_Hook);  // CWeapon::DoBulletImpact
     patch::RedirectCall(0x73BD20, CObject__ObjectDamage_Hook);  // CWeapon::DoBulletImpact
+
+    if (patch::GetUInt(0x85AD8C) == 0x4B35A0)
+        patch::SetPointer(0x85AD8C, CEventDamage__AffectsPed_VHook);  // CEventDamage vtable: AffectsPed
 
     /* patch::RedirectCall(0x439055, CEventDamage__AffectsPed_Hook);
      patch::RedirectCall(0x4813CD, CEventDamage__AffectsPed_Hook);

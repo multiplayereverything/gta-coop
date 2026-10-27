@@ -124,7 +124,7 @@ class UpdateAllTags : public Packet
     DEFINE_PACKET_TYPE(UpdateAllTags, ePacketType::UPDATE_ALL_TAGS, ePacketChannel::EVENT);
 
 public:
-    TagUpdate::Payload tags[100];
+    TagUpdate::Payload tags[150];  // every tag (CTagManager::ms_tagDesc)
 
 private:
     template <typename Stream>

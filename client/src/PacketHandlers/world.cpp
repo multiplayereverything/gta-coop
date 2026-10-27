@@ -31,7 +31,10 @@ PACKET_HANDLER(ePacketType::TAG_UPDATE, Packets::World::TagUpdate* pTagUpdate)
 			static_cast<int16_t>(floor(pos.y)) == pTagUpdate->payload.pos_y &&
 			static_cast<int16_t>(floor(pos.z)) == pTagUpdate->payload.pos_z)
 		{
-			CTagManager::SetAlpha(tagDesc.m_pEntity, pTagUpdate->payload.alpha);
+			// paint only goes on: a late partial update (or two players spraying one tag) must not take a finished
+			// tag back below what the mission counts as sprayed
+			if (pTagUpdate->payload.alpha > tagDesc.m_nAlpha)
+				CTagManager::SetAlpha(tagDesc.m_pEntity, pTagUpdate->payload.alpha);
 		}
 	}
 }
@@ -56,7 +59,8 @@ PACKET_HANDLER(ePacketType::UPDATE_ALL_TAGS, Packets::World::UpdateAllTags* pUpd
 				static_cast<int16_t>(floor(pos.y)) == tag.pos_y &&
 				static_cast<int16_t>(floor(pos.z)) == tag.pos_z)
 			{
-				CTagManager::SetAlpha(tagDesc.m_pEntity, tag.alpha);
+				if (tag.alpha > tagDesc.m_nAlpha)
+					CTagManager::SetAlpha(tagDesc.m_pEntity, tag.alpha);
 			}
 		}
 	}

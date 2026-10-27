@@ -13,6 +13,8 @@
 #include "CSaveSync.h"
 #include "CUserTrackSync.h"
 #include "CPlaytestReport.h"
+#include "CChatCommands.h"
+#include "Hooks/WorldHooks.h"
 #include "CMissionPartnerVehicles.h"
 #include <game_sa/CTagManager.h>
 #include <CStats.h>
@@ -1034,7 +1036,7 @@ void CAutoTest::Execute(const std::string& line)
         MultiByteToWideChar(CP_UTF8, 0, text.c_str(), -1, packet.message, Config::MAX_CHAT_MESSAGE_LENGTH);
         packet.message[Config::MAX_CHAT_MESSAGE_LENGTH] = L'\0';
         // the same commands the chat box takes ("/report ...")
-        if (CPlaytestReport::HandleChatCommand(packet.message))
+        if (CPlaytestReport::HandleChatCommand(packet.message) || CChatCommands::Handle(packet.message))
             result = "command";
         else
         {
@@ -1168,21 +1170,69 @@ void CAutoTest::Execute(const std::string& line)
         Command<Commands::GET_GROUP_SIZE>(group, &leaders, &members);
         result = "members=" + std::to_string(members);
     }
+    else if (verb == "pedsnear")
+    {
+        // pedsnear <model> <radius>: each ped of that model: position, visible, created by, and its network side
+        int model = 0;
+        float radius = 10.0f;
+        in >> model >> radius;
+        std::ostringstream o;
+        for (int i = 0; i < CPools::ms_pPedPool->m_nSize; i++)
+            if (CPed* ped = CPools::ms_pPedPool->GetAt(i))
+                if (ped->m_nModelIndex == model && !ped->IsPlayer() && (ped->GetPosition() - player->GetPosition()).Magnitude() < radius)
+                {
+                    CNetworkPed* np = CNetworkPedManager::GetPed(ped);
+                    o << "[" << ped->GetPosition().x << " " << ped->GetPosition().y << " " << ped->GetPosition().z
+                      << " vis=" << ped->m_bIsVisible << " by=" << (int)ped->m_nCreatedBy << " area=" << (int)ped->m_nAreaCode;
+                    if (np)
+                        o << " net=" << (np->m_bSyncing ? "own" : "copy") << " netBy=" << (int)np->m_nCreatedBy
+                          << " creator=" << np->m_pedId.creator().value();
+                    o << "] ";
+                }
+        result = o.str();
+    }
+    else if (verb == "dupnear")
+    {
+        // dupnear <model> <radius>: a script ped of that model on the spot of the nearest one (what two players' shop
+        // scripts used to make: a second shopkeeper); result = "x y z" or "none"
+        int model = 0;
+        float radius = 10.0f;
+        in >> model >> radius;
+        CPed* nearest = nullptr;
+        for (int i = 0; i < CPools::ms_pPedPool->m_nSize; i++)
+            if (CPed* ped = CPools::ms_pPedPool->GetAt(i))
+                if (ped->m_nModelIndex == model && !ped->IsPlayer() && (ped->GetPosition() - player->GetPosition()).Magnitude() < radius)
+                    nearest = ped;
+        if (!nearest)
+            result = "none";
+        else
+        {
+            CVector p = nearest->GetPosition();
+            Command<Commands::REQUEST_MODEL>(model);
+            Command<Commands::LOAD_ALL_MODELS_NOW>();
+            int ref = 0;
+            Command<Commands::CREATE_CHAR>(4, model, p.x + 0.3f, p.y, p.z - 1.0f, &ref);
+            result = std::to_string(p.x) + " " + std::to_string(p.y) + " " + std::to_string(p.z);
+        }
+    }
     else if (verb == "countnear")
     {
         // countnear <model> <radius>: peds of that model near me and near each other player, as this game sees them
         int model = 0;
         float radius = 10.0f;
         in >> model >> radius;
-        auto count = [&](CVector c) {
+        auto count = [&](CVector c, bool visibleOnly = false) {
             int n = 0;
             for (int i = 0; i < CPools::ms_pPedPool->m_nSize; i++)
                 if (CPed* ped = CPools::ms_pPedPool->GetAt(i))
-                    if (ped->m_nModelIndex == model && !ped->IsPlayer() && (ped->GetPosition() - c).Magnitude() < radius)
+                    if (ped->m_nModelIndex == model && !ped->IsPlayer() && (ped->GetPosition() - c).Magnitude() < radius &&
+                        (!visibleOnly || ped->m_bIsVisible))
                         n++;
             return n;
         };
-        result = "me=" + std::to_string(count(player->GetPosition()));
+        // visible= what the player sees (a duplicate shopkeeper copy is kept, hidden)
+        result = "me=" + std::to_string(count(player->GetPosition())) + " visible=" +
+                 std::to_string(count(player->GetPosition(), true));
         for (CNetworkPlayer* np : CNetworkPlayerManager::m_pPlayers)
             if (np->m_pPed)
                 result += " p" + std::to_string(np->m_playerId.value()) + "=" + std::to_string(count(np->m_pPed->GetPosition()));
@@ -1221,14 +1271,17 @@ void CAutoTest::Execute(const std::string& line)
                 Command<Commands::WARP_CHAR_FROM_CAR_TO_COORD>(CPools::GetPedRef(player), spot.x, spot.y, spot.z);
             else
                 player->Teleport(spot, false);
+            // painted in two steps and shared by the spray hook's own sender (WorldHooks::SendChangedTags), so the
+            // partial and the final update go out like a real spray's
+            uint8_t before[ARRAY_SIZE(CTagManager::ms_tagDesc)];
+            for (size_t i = 0; i < ARRAY_SIZE(CTagManager::ms_tagDesc); i++)
+                before[i] = CTagManager::ms_tagDesc[i].m_nAlpha;
+            CTagManager::SetAlpha(best->m_pEntity, 120);
+            WorldHooks::SendChangedTags(before);
+            for (size_t i = 0; i < ARRAY_SIZE(CTagManager::ms_tagDesc); i++)
+                before[i] = CTagManager::ms_tagDesc[i].m_nAlpha;
             CTagManager::SetAlpha(best->m_pEntity, 255);
-            Packets::World::TagUpdate packet{};
-            packet.payload.bFullySprayed = true;
-            packet.payload.alpha = 255;
-            packet.payload.pos_x = static_cast<int16_t>(floor(t.x));
-            packet.payload.pos_y = static_cast<int16_t>(floor(t.y));
-            packet.payload.pos_z = static_cast<int16_t>(floor(t.z));
-            GetPacketFactory().Send(packet);
+            WorldHooks::SendChangedTags(before);
             result = std::to_string(t.x) + " " + std::to_string(t.y) + " " + std::to_string(t.z);
         }
     }
