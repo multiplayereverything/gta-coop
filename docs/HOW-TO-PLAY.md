@@ -20,7 +20,9 @@
 3. Join the host first. The first player in runs the world (peds, traffic, missions).
 
 ## Missions together
-- The host (first player who joined) runs the story. For ported missions everyone must stand in the mission marker.
+- The host (first player who joined) runs the story, but ANY player can start a mission: step into its marker (or
+  type `/mission <name>`) and the host's game starts it there, moving the host to the marker; everyone far away is
+  brought along. For ported missions everyone nearby must stand in the mission marker.
 - Unported missions show "This mission is currently unsupported": the host starts and plays them, everyone else sees
   the objectives, cutscenes, MISSION PASSED/FAILED banner, and shares the money reward and wanted level.
 - Cutscenes: everyone presses the skip key; it skips when the counter shows N/N.
@@ -36,6 +38,16 @@
   the house and out again, then Ryder's marker appears).
 - Status of every mission: `coop-dev\MISSIONS.md`.
 - Don't start a mission in the first seconds after a new game loads (rare audio crash); walk to the marker first.
+
+## Chat commands (F6, then type)
+- `/help` lists them. `/players` shows everyone with their number.
+- `/tp <name or number>` takes you to that player, `/bring <name or number>` brings them to you, `/goto x y z`,
+  `/pos` shows where you are.
+- `/mission <name or number>` starts a story mission (`/missions` lists them), `/fail` fails the running mission
+  (host), `/skip` votes to skip a cutscene.
+- `/heal`, `/car <name or id>` (e.g. `/car infernus`), `/gun <weapon id> [ammo]`, `/time <hour>` and
+  `/weather <id>` (host; everyone follows the host's clock and weather).
+- Debug menu: type the cheat `D1212`, tick Missions, and click one to start it.
 
 ## If something goes wrong
 - Chat (F6): `/report what happened` saves `CoopAndreas_reports\report-<time>.txt` in the game folder (mission,

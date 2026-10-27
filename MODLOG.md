@@ -2,6 +2,31 @@
 
 Newest first. Every change to the game folder or the CoopAndreas fork goes here.
 
+## 2026-10-27: 1.0.0 published; 1.0.1 fixes from the owner's playtest (testing/playtest-fixes.ps1)
+- 1.0.0 released on github.com/multiplayereverything/gta-coop (version string 1.0.0; commits there carry the
+  JessniX noreply address instead of the local one).
+- Mission markers for every player: a partner's contact script reaching load_and_launch_mission (0417) on a story
+  mission no longer starts it alone on its own game; CommandHooks turns it into MISSION_START_REQUEST, the host moves
+  into the marker (CMissionStartSync::MoveLocalPlayer) and launches it. Coop.LocateAllPlayersOnFoot3D (INT, SWEET)
+  fires on the host when a partner stands in the marker for 1 s. A partner whose request isn't taken gets its
+  $onmission back after 8 s. The D1212 Missions menu works for partners (request) and sets $onmission.
+- Chat commands (CChatCommands): /help /players /tp /bring (TELEPORT_PLAYER_REQUEST) /goto /pos /mission /missions
+  /fail /skip /heal /car /gun /time /weather. Other "/..." lines are still chat.
+- Barber/shopkeepers: a copy of another game's shopkeeper standing on this game's own one is hidden (both games
+  made one when players walked in close together; 3+ players: the older player's copy shows).
+- Big Smoke fighting back: CEventDamage::AffectsPed (vtable 0x85AD8C): a synced copy of another game's NPC no longer
+  reacts locally (that also showed NPCs cowering/sitting on one screen only), and mission chars / our recruits don't
+  react to another player's hit. Height smoothing pulls a copy that sank >0.35 m back up.
+- Tags: the spray sender diffs all 150 tag alphas around SprayPaintWorld (it sent the last SetAlpha'd tag, possibly
+  another one or none); receivers only raise alpha; UpdateAllTags covers 150 tags (was 100).
+- Phone calls: MOB_* scripts' print/print_now/clear_prints go to everyone (ring and voice were already mirrored).
+- Hospital/police tip (HELP.txt): help text only, no 24 s control lock + fixed camera (players got stuck when both
+  respawned there).
+- MISTAKE: build-scm.ps1 deployed main.scm/script.img into the real game folder by default; its default is now the
+  "(test)" copy. The real folder's main.scm/script.img need putting back to 1.0.0 (blocked, asked the owner).
+- Tests: playtest-fixes.ps1 (chat, marker by partner, /mission by partner, tag, barber incl. forced duplicate,
+  hospital): all pass. Not covered: Big Smoke friendly fire, phone call audio, a plain-locate contact (SMOKE etc.).
+
 ## 2026-10-26 (night): playtest kit, real playthroughs, test safety (ef1a3e0..78168c2)
 - Playtest kit for real sessions: `/report <text>` in the chat writes `CoopAndreas_reports\report-<time>.txt`
   (mission, place, players, ping/loss, newest crash log; nothing is sent). The server tells everyone when a player

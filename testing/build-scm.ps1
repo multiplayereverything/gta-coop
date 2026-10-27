@@ -1,5 +1,5 @@
 # Compiles CoopAndreas\scm\main.txt (all mission scripts) with Sanny Builder 4 and deploys main.scm + script.img
-# to GTA San Andreas\CoopAndreas\ (the coop client loads them from there).
+# to "GTA San Andreas (test)\CoopAndreas\" (the coop client loads them from there; -GameDir for another copy).
 #
 #   powershell -ExecutionPolicy Bypass -File testing\build-scm.ps1            # compile + deploy
 #   powershell -ExecutionPolicy Bypass -File testing\build-scm.ps1 -Check     # compile only, compare with the repo copy
@@ -11,7 +11,8 @@
 param(
     [switch]$Check,
     [string]$Sanny = 'C:\Tools\SannyBuilder4\sanny.exe',
-    [string]$GameDir = (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'GTA San Andreas')
+    # the test copy: the real game only gets a build when its owner asks (build.ps1 -Deploy -GameDir ...)
+    [string]$GameDir = (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'GTA San Andreas (test)')
 )
 
 $ErrorActionPreference = 'Stop'

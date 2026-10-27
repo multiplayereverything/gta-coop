@@ -1,22 +1,24 @@
 # GTA San Andreas Co-op
 
-**GTA Co-op 1.0.0:** play the whole GTA San Andreas story with friends. Up to 4 players share one world: missions, cutscenes, money, saves, gang territories and collectibles stay in sync. It runs on **GTA San Andreas PC 1.0 US** (Windows), online over the internet, a VPN or your LAN.
+**GTA Co-op 1.0.1:** play the whole GTA San Andreas story with friends. Up to 4 players share one world: missions, cutscenes, money, saves, gang territories and collectibles stay in sync. It runs on **GTA San Andreas PC 1.0 US** (Windows), online over the internet, a VPN or your LAN.
 
 Created and largely built by **JessniX**, and maintained by **Multiplayer Everything** and **JessniX**. Based on [CoopAndreas](https://github.com/Tornamic/CoopAndreas) by Tornamic and its contributors (GPL-3.0).
 
 ## Install
 
 1. You need your own **GTA San Andreas 1.0 US**. Steam and Rockstar Launcher copies must be downgraded to 1.0 first (search for "GTA SA downgrader"). The release contains no game files.
-2. Download `GTACoop-1.0.0.zip` from [Releases](https://github.com/multiplayereverything/gta-coop/releases).
+2. Download `GTACoop-1.0.1.zip` from [Releases](https://github.com/multiplayereverything/gta-coop/releases).
 3. Copy everything in its `game` folder into your GTA San Andreas folder (next to `gta_sa.exe`) and run `install.bat` there once. `uninstall.bat` puts everything back.
 
-Everyone needs the same version (1.0.0). The server turns away other versions.
+Everyone needs the same version (1.0.1). The server turns away other versions.
 
 ## Play
 
 - **Host:** run `server\server.exe` and leave it open (UDP port 6767, up to 4 players, see `server-config.ini`). Friends reach you through a port forward of UDP 6767, or through a VPN such as Tailscale, ZeroTier or Radmin VPN (easiest).
 - **Everyone, the host too:** start `LaunchCoopAndreas.exe`, then Start Game, enter a nickname, the host's address (the host uses `127.0.0.1`) and port `6767`, and Connect.
-- **The host joins first.** The first player in runs the story.
+- **The host joins first.** The first player in runs the story, but **anyone can start a mission**: walk into its marker (or type `/mission <name>`) and the host's game starts it, with the host moved to the marker.
+
+**Chat commands** (F6, then `/help`): `/players`, `/tp <player>`, `/bring <player>`, `/goto x y z`, `/pos`, `/mission <name or number>`, `/missions`, `/fail`, `/skip`, `/heal`, `/car <name>`, `/gun <weapon id> [ammo]`, `/time <hour>` and `/weather <id>` (host), `/report <what happened>`.
 
 Full guide: [docs/HOW-TO-PLAY.md](docs/HOW-TO-PLAY.md).
 
@@ -27,6 +29,7 @@ Full guide: [docs/HOW-TO-PLAY.md](docs/HOW-TO-PLAY.md).
 - **Mission cars:** when the mission's characters fill the car, the others get a spare copy of it (green blip).
 - **Saves:** whoever saves, everyone gets the host's progress and keeps their own look.
 - **The world:** gang territories and recruits, oysters, horseshoes, snapshots and tags, trailers, other players' cars and the radio (including User Tracks songs).
+- **Phone calls:** everyone hears the call and sees its subtitles.
 
 ## If something goes wrong
 
@@ -39,10 +42,12 @@ Full guide: [docs/HOW-TO-PLAY.md](docs/HOW-TO-PLAY.md).
 - Automated lab tests with hidden copies of the game on one PC: 101 of 102 story missions with 2 players, and 102 missions in one 4-player session with no crash.
 - Real playthroughs with no shortcuts: Big Smoke, Ryder and Tagging Up Turf reached MISSION PASSED on both screens.
 - Bad connections from good Wi-Fi to very bad, rejoining, collectibles, gang recruits, save sync and shared radio.
+- 1.0.1: chat teleports, a friend starting a mission from its marker and with `/mission`, a friend's sprayed tag counting on the host, one barber per shop, and both players keeping control after respawning at the hospital.
 
 ## Known issues
 
-- A session between friends on separate PCs hasn't been tested by us yet.
+- The host's game still runs every mission and the world's people and traffic; a friend's actions go through it.
+- Not lab-tested yet: Big Smoke no longer fighting back, and phone call sound and subtitles for friends.
 - On the host's screen, joined players' bodies can look crumpled.
 - Gang wars, buying property, stunt jumps and minigames (pool, basketball, dancing, casino) are each player's own.
 - Race missions can't be passed by the lab bots; they are untested in co-op.

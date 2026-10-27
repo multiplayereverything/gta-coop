@@ -27,6 +27,8 @@ The host must join first: the first player in runs the story.
 PLAYING MISSIONS TOGETHER
 - The host runs the story. Some missions are fully coop; for the others the host drives the mission and everyone
   else gets the objectives, cutscenes, MISSION PASSED/FAILED, money and wanted level.
+- Anyone can start a mission: walk into its marker (or type /mission <name>). The host's game starts it and the
+  host is moved to the marker.
 - Cutscenes: everyone presses the skip key; it skips at N/N votes.
 - No seat in the mission car? An extra copy of the car spawns behind it for you (green blip).
 - Got a vehicle with a blip of your own (BMX in Big Smoke, Greenwood in Ryder)? Use it - don't take the mission
@@ -38,7 +40,12 @@ PLAYING MISSIONS TOGETHER
 
 SHARED BETWEEN PLAYERS
 Missions (objectives, markers, checkpoints, pickups, fires, trains, cutscenes, rewards), money, saves (everyone keeps
-their own look), gang territories and recruits, oysters/horseshoes/snapshots, your User Tracks songs.
+their own look), gang territories and recruits, oysters/horseshoes/snapshots, sprayed tags, phone calls (ring, voice
+and subtitles), your User Tracks songs.
+
+CHAT COMMANDS (F6, then type; /help lists them)
+/players, /tp <name>, /bring <name>, /goto x y z, /pos, /mission <name or number>, /missions, /fail, /skip,
+/heal, /car <name>, /gun <weapon id> [ammo], /time <hour> and /weather <id> (host), /report <what happened>.
 
 IF SOMETHING GOES WRONG
 - Type /report what happened  in the chat (F6). It saves CoopAndreas_reports\report-<time>.txt in your GTA folder
